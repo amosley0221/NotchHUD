@@ -44,6 +44,15 @@ final class Settings: ObservableObject {
         }
     }
 
+    /// Per-display mode and width, keyed by the display UUID.
+    @Published var displayConfigs: [String: DisplayConfig] {
+        didSet {
+            if let data = try? JSONEncoder().encode(displayConfigs) {
+                UserDefaults.standard.set(data, forKey: "displayConfigs")
+            }
+        }
+    }
+
     @Published var leagues: Set<String> {
         didSet { UserDefaults.standard.set(Array(leagues), forKey: "leagues") }
     }
@@ -73,8 +82,25 @@ final class Settings: ObservableObject {
             bookmarks = []
         }
 
+        if let data = defaults.data(forKey: "displayConfigs"),
+           let decoded = try? JSONDecoder().decode([String: DisplayConfig].self, from: data) {
+            displayConfigs = decoded
+        } else {
+            displayConfigs = [:]
+        }
+
         leagues = Set(defaults.stringArray(forKey: "leagues") ?? [])
         teams = Set(defaults.stringArray(forKey: "teams") ?? [])
+    }
+
+    /// The screen's own settings, falling back to the global defaults.
+    func config(for screen: NSScreen) -> DisplayConfig {
+        displayConfigs[screen.persistentID]
+            ?? DisplayConfig(mode: externalMode, widthScale: 1.0)
+    }
+
+    func setConfig(_ config: DisplayConfig, for screen: NSScreen) {
+        displayConfigs[screen.persistentID] = config
     }
 
     func isEnabled(_ module: Module) -> Bool { modules[module] ?? true }

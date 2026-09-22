@@ -9,7 +9,17 @@ final class PanelController: NSObject {
     private var panels: [PanelEntry] = []
     private var cancellables = Set<AnyCancellable>()
     private var outsideMonitor: Any?
-    private var lastExternalMode: ExternalMode = Settings.shared.externalMode
+    private var lastLayoutSignature: String = PanelController.layoutSignature()
+
+    /// Everything that changes a panel's geometry, in one comparable value.
+    private static func layoutSignature() -> String {
+        let settings = Settings.shared
+        let overrides = settings.displayConfigs
+            .sorted { $0.key < $1.key }
+            .map { "\($0.key):\($0.value.mode.rawValue):\($0.value.widthScale)" }
+            .joined(separator: "|")
+        return "\(settings.externalMode.rawValue)#\(overrides)"
+    }
 
     private struct PanelEntry {
         let panel: HUDPanel
@@ -32,17 +42,17 @@ final class PanelController: NSObject {
             .sink { [weak self] mode in self?.resize(for: mode) }
             .store(in: &cancellables)
 
-        // Only the external-display mode changes a panel's geometry. Rebuilding on
-        // every settings write would tear down and recreate every panel whenever
-        // the user flipped a toggle — the SwiftUI views already observe the rest.
+        // Only geometry changes need a rebuild. Doing it on every settings write
+        // would tear down and recreate every panel whenever the user flipped a
+        // toggle — the SwiftUI views already observe the rest.
         Settings.shared.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     guard let self else { return }
-                    let mode = Settings.shared.externalMode
-                    guard mode != self.lastExternalMode else { return }
-                    self.lastExternalMode = mode
+                    let signature = PanelController.layoutSignature()
+                    guard signature != self.lastLayoutSignature else { return }
+                    self.lastLayoutSignature = signature
                     self.rebuild()
                 }
             }
@@ -65,10 +75,12 @@ final class PanelController: NSObject {
         for screen in NSScreen.screens {
             // A physical notch shows up as a non-zero top safe-area inset.
             let hasNotch = screen.safeAreaInsets.top > 0
+            let config = Settings.shared.config(for: screen)
             let geometry = PanelGeometry(
                 hasNotch: hasNotch,
-                mode: Settings.shared.externalMode,
-                screen: screen
+                mode: config.mode,
+                screen: screen,
+                widthScale: CGFloat(config.widthScale)
             )
 
             let frame = geometry.frame(for: geometry.compactSize)
@@ -115,7 +127,7 @@ final class PanelController: NSObject {
         case .expanded:
             // Height is generous and the content is scrollable; a fixed panel keeps
             // the window server from thrashing on every tab change.
-            return CGSize(width: Tokens.expandedWidth, height: 460)
+            return CGSize(width: geometry.expandedWidth, height: 460)
         }
     }
 

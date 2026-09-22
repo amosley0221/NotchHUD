@@ -35,17 +35,24 @@ struct PanelGeometry {
     var hasNotch: Bool
     var mode: ExternalMode
     var screen: NSScreen
+    /// Per-display width multiplier; height is deliberately untouched.
+    var widthScale: CGFloat = 1.0
 
     /// The notch is only in the middle of the built-in display; on external screens
     /// in notch-shape mode we draw the same silhouette anyway so the two match.
     var drawsNotchShape: Bool { hasNotch || mode == .notchShape }
 
     var compactSize: CGSize {
-        if drawsNotchShape { return CGSize(width: Tokens.notchWidth, height: Tokens.notchHeight) }
+        if drawsNotchShape {
+            return CGSize(width: Tokens.notchWidth * widthScale, height: Tokens.notchHeight)
+        }
         switch mode {
-        case .menuBar: return CGSize(width: Tokens.menuBarPillWidth, height: Tokens.menuBarPillHeight)
-        case .floatingPill: return CGSize(width: Tokens.floatingPillWidth, height: Tokens.notchHeight)
-        case .notchShape: return CGSize(width: Tokens.notchWidth, height: Tokens.notchHeight)
+        case .menuBar:
+            return CGSize(width: Tokens.menuBarPillWidth * widthScale, height: Tokens.menuBarPillHeight)
+        case .floatingPill:
+            return CGSize(width: Tokens.floatingPillWidth * widthScale, height: Tokens.notchHeight)
+        case .notchShape:
+            return CGSize(width: Tokens.notchWidth * widthScale, height: Tokens.notchHeight)
         }
     }
 
@@ -59,7 +66,12 @@ struct PanelGeometry {
     }
 
     /// Gap left empty in the middle so the shape reads as a notch.
-    var centerGap: CGFloat { drawsNotchShape ? Tokens.notchGap : 0 }
+    /// Only the built-in display has a real notch to leave room for; a scaled
+    /// silhouette on an external screen scales its gap with it.
+    var centerGap: CGFloat {
+        guard drawsNotchShape else { return 0 }
+        return hasNotch ? Tokens.notchGap : Tokens.notchGap * widthScale
+    }
 
     /// Distance from the top of the screen to the top of the HUD.
     var topInset: CGFloat {
@@ -77,8 +89,9 @@ struct PanelGeometry {
             : .statusBar
     }
 
-    var toastWidth: CGFloat { drawsNotchShape ? Tokens.toastWidthNotch : Tokens.toastWidthPill }
-    var callWidth: CGFloat { drawsNotchShape ? Tokens.callWidthNotch : Tokens.callWidthPill }
+    var toastWidth: CGFloat { (drawsNotchShape ? Tokens.toastWidthNotch : Tokens.toastWidthPill) * widthScale }
+    var callWidth: CGFloat { (drawsNotchShape ? Tokens.callWidthNotch : Tokens.callWidthPill) * widthScale }
+    var expandedWidth: CGFloat { min(Tokens.expandedWidth * widthScale, screen.frame.width - 40) }
 
     /// Places a frame of `size` at the top-centre of this screen, in AppKit's
     /// bottom-left origin coordinates.

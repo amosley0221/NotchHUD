@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @main
@@ -21,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var pomodoroTimer: Timer?
     private var escMonitor: Any?
+    private var updateMenuItem: NSMenuItem?
+    private var updateObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         panelController = PanelController()
@@ -33,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardService.shared.start()
         MediaService.shared.start()
         ShortcutService.shared.start()
+        UpdateService.shared.start()
 
         installMenuBarItem()
         installEscMonitor()
@@ -81,6 +85,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        updateMenuItem = menu.addItem(
+            withTitle: "Check for Updates…",
+            action: #selector(handleUpdateMenuItem),
+            keyEquivalent: ""
+        )
+        updateMenuItem?.target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Toggle Quiet", action: #selector(toggleQuiet), keyEquivalent: "q").target = self
         menu.addItem(withTitle: "Grant Accessibility…", action: #selector(grantAccessibility), keyEquivalent: "").target = self
@@ -89,6 +99,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         item.menu = menu
         statusItem = item
+
+        // A dot beside the menu bar icon is the whole update UI: visible if you
+        // look, invisible if you do not.
+        updateObserver = UpdateService.shared.$state
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state in self?.reflect(updateState: state) }
+    }
+
+    private func reflect(updateState state: UpdateService.State) {
+        guard let button = statusItem?.button else { return }
+
+        switch state {
+        case .available(let version):
+            button.attributedTitle = NSAttributedString(
+                string: " \u{25CF}",
+                attributes: [
+                    .foregroundColor: NSColor.controlAccentColor,
+                    .font: NSFont.systemFont(ofSize: 7),
+                ]
+            )
+            updateMenuItem?.title = "Update to \(version)…"
+        case .downloading:
+            updateMenuItem?.title = "Downloading…"
+        case .installing:
+            updateMenuItem?.title = "Installing…"
+        case .checking:
+            updateMenuItem?.title = "Checking…"
+        case .failed(let message):
+            button.attributedTitle = NSAttributedString(string: "")
+            updateMenuItem?.title = "Update failed — \(message)"
+        case .idle, .upToDate:
+            button.attributedTitle = NSAttributedString(string: "")
+            updateMenuItem?.title = "Check for Updates…"
+        }
+    }
+
+    @objc private func handleUpdateMenuItem() {
+        Task {  in
+            if UpdateService.shared.updateAvailable {
+                await UpdateService.shared.installAndRelaunch()
+            } else {
+                await UpdateService.shared.check()
+            }
+        }
     }
 
     private func installEscMonitor() {

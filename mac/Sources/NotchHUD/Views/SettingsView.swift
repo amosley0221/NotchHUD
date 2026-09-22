@@ -7,6 +7,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralPane().tabItem { Label("General", systemImage: "gearshape") }
+            DisplaysPane().tabItem { Label("Displays", systemImage: "display.2") }
             ModulesPane().tabItem { Label("Modules", systemImage: "square.grid.2x2") }
             QuietPane().tabItem { Label("Quiet", systemImage: "moon") }
             SportsPane().tabItem { Label("Sports", systemImage: "sportscourt") }
@@ -46,6 +47,10 @@ private struct GeneralPane: View {
                 Toggle("Use Celsius", isOn: $settings.useCelsius)
             }
 
+            Section("Updates") {
+                UpdateRow()
+            }
+
             Section("Permissions") {
                 HStack {
                     Text(ShortcutService.shared.hasAccessibilityPermission
@@ -60,6 +65,43 @@ private struct GeneralPane: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct UpdateRow: View {
+    @ObservedObject private var updates = UpdateService.shared
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Version \(updates.currentVersion)")
+                Text(statusText).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            switch updates.state {
+            case .available:
+                Button("Install and Relaunch") {
+                    Task { await updates.installAndRelaunch() }
+                }
+                .buttonStyle(.borderedProminent)
+            case .downloading, .installing, .checking:
+                ProgressView().controlSize(.small)
+            default:
+                Button("Check Now") { Task { await updates.check() } }
+            }
+        }
+    }
+
+    private var statusText: String {
+        switch updates.state {
+        case .idle: "Updates are checked on launch and every six hours."
+        case .checking: "Checking…"
+        case .upToDate: "Up to date."
+        case .available(let version): "Version \(version) is available."
+        case .downloading: "Downloading…"
+        case .installing: "Installing…"
+        case .failed(let message): "Check failed — \(message)"
+        }
     }
 }
 
@@ -85,6 +127,89 @@ private struct WeatherLocationField: View {
         if !settings.weatherCity.isEmpty {
             Text("Currently: \(settings.weatherCity)").font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// One row per connected screen. A width that suits a widescreen monitor is far
+/// too much of a 13" Sidecar iPad, so each display gets its own mode and length.
+private struct DisplaysPane: View {
+    @EnvironmentObject private var settings: Settings
+    @State private var screens: [NSScreen] = NSScreen.screens
+
+    var body: some View {
+        Form {
+            ForEach(screens, id: \.persistentID) { screen in
+                Section(header: Text(label(for: screen))) {
+                    let config = settings.config(for: screen)
+
+                    if screen.safeAreaInsets.top > 0 {
+                        Text("Built-in display — the HUD is fused to the notch.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Picker(
+                            "Shape",
+                            selection: Binding(
+                                get: { config.mode },
+                                set: { settings.setConfig(DisplayConfig(mode: $0, widthScale: config.widthScale), for: screen) }
+                            )
+                        ) {
+                            ForEach(ExternalMode.allCases) { Text($0.label).tag($0) }
+                        }
+                    }
+
+                    HStack {
+                        Slider(
+                            value: Binding(
+                                get: { config.widthScale },
+                                set: { settings.setConfig(DisplayConfig(mode: config.mode, widthScale: $0), for: screen) }
+                            ),
+                            in: 0.4...1.2,
+                            step: 0.05
+                        ) {
+                            Text("Length")
+                        }
+                        Text("\(Int(config.widthScale * 100))%")
+                            .font(.system(.body, design: .monospaced))
+                            .frame(width: 52, alignment: .trailing)
+                    }
+
+                    Text(sizeSummary(for: screen, config: config))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                Button("Refresh display list") { screens = NSScreen.screens }
+                Text("Settings are remembered per display, so unplugging and reconnecting keeps them.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .onReceive(
+            NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+        ) { _ in
+            screens = NSScreen.screens
+        }
+    }
+
+    private func label(for screen: NSScreen) -> String {
+        let size = screen.frame.size
+        return "\(screen.localizedName) · \(Int(size.width)) × \(Int(size.height))"
+    }
+
+    private func sizeSummary(for screen: NSScreen, config: DisplayConfig) -> String {
+        let geometry = PanelGeometry(
+            hasNotch: screen.safeAreaInsets.top > 0,
+            mode: config.mode,
+            screen: screen,
+            widthScale: CGFloat(config.widthScale)
+        )
+        let width = Int(geometry.compactSize.width)
+        let percent = Int(geometry.compactSize.width / screen.frame.width * 100)
+        return "HUD is \(width) pt wide — about \(percent)% of this screen."
     }
 }
 
