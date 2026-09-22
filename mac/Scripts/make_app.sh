@@ -31,10 +31,16 @@ if ! otool -L "$APP/Contents/MacOS/NotchHUD" | grep -q SwiftUI; then
   echo "error: Contents/MacOS/NotchHUD does not link SwiftUI — the wrong binary was copied" >&2
   exit 1
 fi
-if ! "$APP/Contents/Resources/notchhud" 2>&1 | grep -q "push agent state"; then
-  echo "error: Contents/Resources/notchhud is not the CLI" >&2
-  exit 1
-fi
+# Capture first, then match: the CLI exits 2 when it prints usage, and with
+# pipefail a pipeline would report that as a failure even on a match.
+CLI_OUTPUT="$("$APP/Contents/Resources/notchhud" 2>&1 || true)"
+case "$CLI_OUTPUT" in
+  *"push agent state"*) ;;
+  *)
+    echo "error: Contents/Resources/notchhud is not the CLI" >&2
+    exit 1
+    ;;
+esac
 echo "verified: app binary links SwiftUI, CLI responds to --help"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
