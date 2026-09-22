@@ -16,7 +16,8 @@ rm -rf dist
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN_DIR/NotchHUD" "$APP/Contents/MacOS/NotchHUD"
-cp "$BIN_DIR/notchhud" "$APP/Contents/MacOS/notchhud"
+# Installed under the name people actually type; see the note in Package.swift.
+cp "$BIN_DIR/notchhud-cli" "$APP/Contents/MacOS/notchhud"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
