@@ -35,6 +35,7 @@ data class SettingsSnapshot(
     val weatherLat: Double? = null,
     val weatherLon: Double? = null,
     val weatherCity: String = "",
+    val useDeviceLocation: Boolean = false,
     val useCelsius: Boolean = false,
     val quietFollowsDnd: Boolean = true,
     val quietOnCall: Boolean = true,
@@ -99,6 +100,7 @@ class SettingsRepository(private val context: Context) {
         val weatherLat = stringPreferencesKey("weather_lat")
         val weatherLon = stringPreferencesKey("weather_lon")
         val weatherCity = stringPreferencesKey("weather_city")
+        val useDeviceLocation = booleanPreferencesKey("use_device_location")
         val useCelsius = booleanPreferencesKey("use_celsius")
         val quietFollowsDnd = booleanPreferencesKey("quiet_dnd")
         val quietOnCall = booleanPreferencesKey("quiet_call")
@@ -127,6 +129,7 @@ class SettingsRepository(private val context: Context) {
             weatherLat = p[Keys.weatherLat]?.toDoubleOrNull(),
             weatherLon = p[Keys.weatherLon]?.toDoubleOrNull(),
             weatherCity = p[Keys.weatherCity] ?: "",
+            useDeviceLocation = p[Keys.useDeviceLocation] ?: false,
             useCelsius = p[Keys.useCelsius] ?: false,
             quietFollowsDnd = p[Keys.quietFollowsDnd] ?: true,
             quietOnCall = p[Keys.quietOnCall] ?: true,
@@ -149,6 +152,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setTeams(v: Set<String>) = edit { it[Keys.teams] = v }
     suspend fun setCompanionUrl(v: String) = edit { it[Keys.companionUrl] = v }
     suspend fun setUseCelsius(v: Boolean) = edit { it[Keys.useCelsius] = v }
+    suspend fun setUseDeviceLocation(v: Boolean) = edit { it[Keys.useDeviceLocation] = v }
     suspend fun setQuietFollowsDnd(v: Boolean) = edit { it[Keys.quietFollowsDnd] = v }
     suspend fun setQuietOnCall(v: Boolean) = edit { it[Keys.quietOnCall] = v }
     suspend fun setQuietManual(v: Boolean) = edit { it[Keys.quietManual] = v }

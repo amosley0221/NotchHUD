@@ -33,6 +33,7 @@ import com.notchhud.island.core.SettingsSnapshot
 import com.notchhud.island.core.SportsMode
 import com.notchhud.island.data.CalendarRepository
 import com.notchhud.island.data.EspnRepository
+import com.notchhud.island.data.LocationProvider
 import com.notchhud.island.data.WeatherRepository
 import com.notchhud.island.ui.IslandRoot
 import com.notchhud.island.ui.setup.MainActivity
@@ -481,7 +482,9 @@ class IslandOverlayService : LifecycleService() {
             IslandState.setPlays(emptyList())
         }
 
-        if (settings.modules[Modules.WEATHER] == true && settings.weatherLat != null && settings.weatherLon != null) {
+        val hasWeatherLocation = settings.useDeviceLocation ||
+            (settings.weatherLat != null && settings.weatherLon != null)
+        if (settings.modules[Modules.WEATHER] == true && hasWeatherLocation) {
             weatherJob = lifecycleScope.launch { pollWeather(settings) }
         } else {
             IslandState.setWeather(null)
@@ -529,13 +532,30 @@ class IslandOverlayService : LifecycleService() {
     }
 
     private suspend fun pollWeather(settings: SettingsSnapshot) {
-        val lat = settings.weatherLat ?: return
-        val lon = settings.weatherLon ?: return
+        val locations = LocationProvider(applicationContext)
+
         while (currentCoroutineContext().isActive) {
-            val city = settings.weatherCity.ifBlank { weatherRepo.cityFor(lat, lon) }
-            IslandState.setWeather(weatherRepo.fetch(lat, lon, city))
-            delay(15 * 60 * 1000L)
+            val fix = resolveWeatherLocation(settings, locations)
+            IslandState.setWeather(fix?.let { weatherRepo.fetch(it.latitude, it.longitude, it.city) })
+            // A device fix moves with you, so re-check more often than a pinned city.
+            delay(if (settings.useDeviceLocation) 10 * 60 * 1000L else 15 * 60 * 1000L)
         }
+    }
+
+    private data class WeatherFix(val latitude: Double, val longitude: Double, val city: String)
+
+    private suspend fun resolveWeatherLocation(
+        settings: SettingsSnapshot,
+        locations: LocationProvider,
+    ): WeatherFix? {
+        if (settings.useDeviceLocation) {
+            val location = locations.current() ?: return null
+            val city = locations.cityName(location.latitude, location.longitude).orEmpty()
+            return WeatherFix(location.latitude, location.longitude, city)
+        }
+        val lat = settings.weatherLat ?: return null
+        val lon = settings.weatherLon ?: return null
+        return WeatherFix(lat, lon, settings.weatherCity)
     }
 
     private suspend fun pollCalendar() {

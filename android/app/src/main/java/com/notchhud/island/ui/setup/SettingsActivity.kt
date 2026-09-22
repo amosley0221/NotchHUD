@@ -22,12 +22,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,8 +40,14 @@ import com.notchhud.island.core.Modules
 import com.notchhud.island.core.SettingsRepository
 import com.notchhud.island.core.SettingsSnapshot
 import com.notchhud.island.core.SportsMode
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.notchhud.island.data.EspnRepository
+import com.notchhud.island.data.LocationProvider
 import com.notchhud.island.data.WeatherRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class SettingsActivity : ComponentActivity() {
@@ -59,6 +67,11 @@ class SettingsActivity : ComponentActivity() {
 private fun SettingsScreen(repo: SettingsRepository) {
     val settings by repo.flow.collectAsState(initial = SettingsSnapshot())
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Permission state only changes while we are away in system Settings.
+    var refresh by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh++ }
     val espn = remember { EspnRepository() }
     val weather = remember { WeatherRepository() }
 
@@ -128,19 +141,36 @@ private fun SettingsScreen(repo: SettingsRepository) {
         TeamPicker(settings, espn) { scope.launch { repo.setTeams(it) } }
 
         Header("Weather")
-        var city by remember { mutableStateOf("") }
-        OutlinedTextField(
-            value = city,
-            onValueChange = { city = it },
-            label = { Text(settings.weatherCity.ifBlank { "City" }) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(onClick = {
-            scope.launch {
-                weather.geocode(city)?.let { (lat, lon, name) -> repo.setLocation(lat, lon, name) }
-            }
-        }) { Text("Set location") }
+        val locations = remember { LocationProvider(context) }
+        val locationGranted = remember(refresh) { locations.hasPermission() }
+
+        ToggleRow("Use my current location", settings.useDeviceLocation) {
+            scope.launch { repo.setUseDeviceLocation(it) }
+        }
+        if (settings.useDeviceLocation) {
+            Text(
+                if (locationGranted) {
+                    "The forecast follows the phone, rechecked every 10 minutes."
+                } else {
+                    "Location permission is off — grant it on the main screen, or turn this back off and set a city."
+                },
+                fontSize = 11.sp,
+            )
+        } else {
+            var city by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = city,
+                onValueChange = { city = it },
+                label = { Text(settings.weatherCity.ifBlank { "City" }) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(onClick = {
+                scope.launch {
+                    weather.geocode(city)?.let { (lat, lon, name) -> repo.setLocation(lat, lon, name) }
+                }
+            }) { Text("Set location") }
+        }
         ToggleRow("Use Celsius", settings.useCelsius) { scope.launch { repo.setUseCelsius(it) } }
 
         Header("Companion link")
@@ -164,9 +194,21 @@ private fun SettingsScreen(repo: SettingsRepository) {
     }
 }
 
+/**
+ * Searchable team list.
+ *
+ * Fetches every selected league in parallel and says what it is doing. The first
+ * version ran them one after another with no feedback and swallowed failures, so
+ * a tap on "Load teams" looked like nothing at all — the college leagues alone
+ * are ~1 MB each and can take a while.
+ */
 @Composable
 private fun TeamPicker(settings: SettingsSnapshot, espn: EspnRepository, onChange: (Set<String>) -> Unit) {
     var teams by remember(settings.leagues) { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var failed by remember(settings.leagues) { mutableStateOf<List<String>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var loaded by remember(settings.leagues) { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     if (settings.leagues.isEmpty()) {
@@ -174,23 +216,57 @@ private fun TeamPicker(settings: SettingsSnapshot, espn: EspnRepository, onChang
         return
     }
 
-    Button(onClick = {
-        scope.launch { teams = settings.leagues.flatMap { espn.teams(it) }.sortedBy { it.second } }
-    }) { Text("Load teams") }
+    Button(
+        enabled = !loading,
+        onClick = {
+            loading = true
+            scope.launch {
+                val results = coroutineScope {
+                    settings.leagues.map { code -> async { code to espn.teams(code) } }.awaitAll()
+                }
+                teams = results.mapNotNull { it.second }.flatten().distinctBy { it.first }.sortedBy { it.second }
+                failed = results.filter { it.second == null }.map { it.first }
+                loaded = true
+                loading = false
+            }
+        },
+    ) { Text(if (loading) "Loading…" else "Load teams") }
+
+    if (loading) {
+        Text("Fetching ${settings.leagues.size} league(s)…", fontSize = 11.sp)
+    }
+
+    if (failed.isNotEmpty()) {
+        Text("Could not reach: ${failed.sorted().joinToString(", ")}", fontSize = 11.sp)
+    }
+
+    if (loaded && teams.isEmpty() && failed.isEmpty()) {
+        Text("No teams came back for those leagues.", fontSize = 11.sp)
+    }
 
     if (teams.isNotEmpty()) {
-        var query by remember { mutableStateOf("") }
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Search teams") },
+            label = { Text("Search ${teams.size} teams") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        teams.filter { it.second.contains(query, ignoreCase = true) }.take(25).forEach { (id, name) ->
+
+        val matches = teams.filter { it.second.contains(query, ignoreCase = true) }
+        val shown = matches.take(25)
+        shown.forEach { (id, name) ->
             ToggleRow(name, id in settings.teams) { on ->
                 onChange(settings.teams.toMutableSet().apply { if (on) add(id) else remove(id) })
             }
+        }
+        if (matches.size > shown.size) {
+            Text("Showing ${shown.size} of ${matches.size} — type to narrow.", fontSize = 11.sp)
+        }
+
+        val followed = settings.teams.size
+        if (followed > 0) {
+            Text("Following $followed team(s).", fontSize = 11.sp)
         }
     }
 }

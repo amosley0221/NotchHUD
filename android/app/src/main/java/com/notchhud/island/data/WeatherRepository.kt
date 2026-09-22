@@ -72,17 +72,6 @@ class WeatherRepository {
         }.getOrNull()
     }
 
-    /** Reverse geocode just enough to label the card. Falls back to coordinates. */
-    suspend fun cityFor(lat: Double, lon: Double): String = withContext(Dispatchers.IO) {
-        val body = Http.getString(
-            "https://geocoding-api.open-meteo.com/v1/search?count=1&latitude=$lat&longitude=$lon"
-        )
-        runCatching {
-            json.parseToJsonElement(body!!).jsonObject["results"]!!.jsonArray[0]
-                .jsonObject["name"]!!.jsonPrimitive.content
-        }.getOrElse { "%.2f, %.2f".format(lat, lon) }
-    }
-
     suspend fun geocode(query: String): Triple<Double, Double, String>? = withContext(Dispatchers.IO) {
         val body = Http.getString(
             "https://geocoding-api.open-meteo.com/v1/search?count=1&name=" +

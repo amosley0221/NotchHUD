@@ -42,12 +42,18 @@ class EspnRepository {
         private const val POST_WINDOW_MS = 30 * 60 * 1000L
     }
 
-    /** Teams in a league, for the searchable picker in Settings. */
-    suspend fun teams(leagueCode: String): List<Pair<String, String>> = withContext(Dispatchers.IO) {
-        val path = KNOWN_LEAGUES[leagueCode] ?: return@withContext emptyList()
+    /**
+     * Teams in a league, for the searchable picker in Settings.
+     *
+     * Returns null when the fetch or the parse failed, as opposed to an empty list
+     * for a league that genuinely has no teams. Collapsing both into "empty" is why
+     * the picker used to show nothing at all with no hint as to why.
+     */
+    suspend fun teams(leagueCode: String): List<Pair<String, String>>? = withContext(Dispatchers.IO) {
+        val path = KNOWN_LEAGUES[leagueCode] ?: return@withContext null
         val body = Http.getString(
             "https://site.api.espn.com/apis/site/v2/sports/${path.sport}/${path.league}/teams"
-        ) ?: return@withContext emptyList()
+        ) ?: return@withContext null
 
         runCatching {
             json.parseToJsonElement(body).jsonObject["sports"]!!.jsonArray[0].jsonObject["leagues"]!!
@@ -55,7 +61,7 @@ class EspnRepository {
                     val team = entry.jsonObject["team"]!!.jsonObject
                     team["id"]!!.jsonPrimitive.content to team["displayName"]!!.jsonPrimitive.content
                 }
-        }.getOrDefault(emptyList())
+        }.getOrNull()
     }
 
     /**
