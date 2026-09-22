@@ -1,0 +1,26 @@
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+*.jks
+*.keystore
+keystore.properties
+
+# Swift / Xcode
+mac/.build/
+mac/.swiftpm/
+mac/dist/
+*.xcodeproj
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Misc
+dist/
+*.log
+*.p12
+*.pem

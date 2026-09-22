@@ -1,0 +1,223 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.1 (must match android/version.properties)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # -------------------------------------------------------------- version
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          FILE_VERSION="$(grep -E '^versionName=' android/version.properties | cut -d= -f2 | tr -d '[:space:]')"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+          else
+            TAG_VERSION="${{ inputs.version }}"
+          fi
+
+          if [ "$FILE_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::android/version.properties says $FILE_VERSION but the release is $TAG_VERSION. Bump the file and re-tag."
+            exit 1
+          fi
+
+          MAJOR=$(echo "$FILE_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$FILE_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$FILE_VERSION" | cut -d. -f3)
+          CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+
+          echo "name=$FILE_VERSION"  >> "$GITHUB_OUTPUT"
+          echo "code=$CODE"          >> "$GITHUB_OUTPUT"
+          echo "tag=v$FILE_VERSION"  >> "$GITHUB_OUTPUT"
+          echo "Releasing $FILE_VERSION (versionCode $CODE)"
+
+      # The single guard that protects in-place updates: Android refuses to install
+      # an APK whose versionCode is not greater than the installed one, so a release
+      # that does not move forward would strand every existing user.
+      - name: Refuse a versionCode that does not move forward
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PREV=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+          if [ -z "$PREV" ] || [ "$PREV" = "null" ]; then
+            echo "No previous release — nothing to compare against."
+            exit 0
+          fi
+          PREV_VERSION="${PREV#v}"
+          PM=$(echo "$PREV_VERSION" | cut -d. -f1); Pm=$(echo "$PREV_VERSION" | cut -d. -f2); Pp=$(echo "$PREV_VERSION" | cut -d. -f3)
+          PREV_CODE=$(( PM * 10000 + Pm * 100 + Pp ))
+          NEW_CODE=${{ steps.version.outputs.code }}
+          echo "previous $PREV_VERSION (code $PREV_CODE) → new ${{ steps.version.outputs.name }} (code $NEW_CODE)"
+          if [ "$NEW_CODE" -le "$PREV_CODE" ]; then
+            echo "::error::versionCode $NEW_CODE is not greater than the last release's $PREV_CODE. Users could not update in place."
+            exit 1
+          fi
+
+      # -------------------------------------------------------------- signing
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 is not set. Publishing an unsigned or debug-signed APK would break in-place updates."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "Keystore restored ($(stat -c%s "$RUNNER_TEMP/release.jks") bytes)"
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          NOTCHHUD_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          NOTCHHUD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          NOTCHHUD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          NOTCHHUD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon -PrequireReleaseSigning=true assembleRelease
+
+      # Proves the published APK really is signed by the key every previous release
+      # used. If this fingerprint ever changes, updates break — so it is printed into
+      # the release notes for the record.
+      - name: Verify signature and record certificate fingerprint
+        id: sig
+        run: |
+          set -euo pipefail
+          APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BUILD_TOOLS/apksigner" verify --print-certs --verbose "$APK" | tee /tmp/sig.txt
+          SHA=$(grep -m1 'SHA-256 digest' /tmp/sig.txt | awk '{print $NF}')
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "apk=$APK"    >> "$GITHUB_OUTPUT"
+
+      - name: Rename APK
+        id: artifact
+        run: |
+          set -euo pipefail
+          DEST="IslandHUD-${{ steps.version.outputs.name }}.apk"
+          cp "${{ steps.sig.outputs.apk }}" "$DEST"
+          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+          sha256sum "$DEST" | tee "$DEST.sha256"
+
+      # ---------------------------------------------------------- release notes
+      - name: Compose release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.name }}"
+          PREV=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+
+          {
+            # Prefer the hand-written CHANGELOG section for this version, if there is one.
+            if [ -f CHANGELOG.md ] && grep -q "^## \[\?$VERSION" CHANGELOG.md; then
+              awk -v v="$VERSION" '
+                $0 ~ "^## \\[?" v { found=1; next }
+                found && /^## / { exit }
+                found { print }
+              ' CHANGELOG.md
+              echo
+            fi
+
+            echo "### Commits in this release"
+            echo
+            if [ -n "$PREV" ] && [ "$PREV" != "null" ] && git rev-parse "$PREV" >/dev/null 2>&1; then
+              git log --no-merges --pretty=format:'- %s (%h)' "$PREV..HEAD"
+            else
+              git log --no-merges --pretty=format:'- %s (%h)' -n 50
+            fi
+            echo
+            echo
+
+            echo "### Install"
+            echo
+            echo "Download \`${{ steps.artifact.outputs.path }}\` below and open it on the phone."
+            echo
+            echo "**Updating from an earlier version installs straight over it — no uninstall, and your settings survive.**"
+            echo "Every release is signed with the same certificate and carries a higher \`versionCode\`:"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| versionName | \`$VERSION\` |"
+            echo "| versionCode | \`${{ steps.version.outputs.code }}\` |"
+            echo "| applicationId | \`com.notchhud.island\` |"
+            echo "| signing cert SHA-256 | \`${{ steps.sig.outputs.sha256 }}\` |"
+            echo
+            echo "If Android ever refuses the install with \`INSTALL_FAILED_UPDATE_INCOMPATIBLE\`, the copy on the phone was a *debug* build — uninstall that one and install this; from then on updates are in place."
+          } > release-notes.md
+
+          cat release-notes.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          gh release create "$TAG" \
+            --title "Island HUD ${{ steps.version.outputs.name }}" \
+            --notes-file release-notes.md \
+            "${{ steps.artifact.outputs.path }}" \
+            "${{ steps.artifact.outputs.path }}.sha256" \
+            || gh release upload "$TAG" \
+                 "${{ steps.artifact.outputs.path }}" \
+                 "${{ steps.artifact.outputs.path }}.sha256" --clobber
+
+  mac:
+    name: macOS app
+    runs-on: macos-15
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        working-directory: mac
+        run: swift build -c release
+
+      - name: Package .app
+        working-directory: mac
+        run: ./Scripts/make_app.sh
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ needs.release.outputs.version }}"
+          gh release upload "$TAG" mac/dist/*.zip --clobber

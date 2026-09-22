@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#0d0d10;font-family:'IBM Plex Sans',Helvetica,sans-serif;color:#e8e8ec;-webkit-font-smoothing:antialiased}
+a{color:#7fb2ff}a:hover{color:#a9caff}
+*{box-sizing:border-box}
+@keyframes hudGlow{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes hudBars{0%,100%{height:5px}50%{height:14px}}
+@keyframes hudFade{0%{opacity:0;transform:translateY(-6px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes islandBounce{0%{transform:scale(1)}30%{transform:scale(1.06,1.12)}60%{transform:scale(.98,.96)}100%{transform:scale(1)}}
+@keyframes islandUnlock{0%{transform:translateY(0) rotate(0)}40%{transform:translateY(-4px) rotate(-18deg)}70%{transform:translateY(-3px) rotate(-14deg)}100%{transform:translateY(-3px) rotate(-14deg)}}
+@keyframes islandPress{0%{transform:scale(1)}100%{transform:scale(1.04)}}
+@keyframes ringPulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.8);opacity:0}}
+</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;min-height:100vh;background:#0d0d10">
+
+  <div style="display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid #1e1e24;flex-wrap:wrap">
+    <div style="font-size:14px;font-weight:600;letter-spacing:.2px">Island HUD — Android · Galaxy Z Fold 8</div>
+    <div style="display:flex;gap:4px;background:#17171c;border-radius:8px;padding:3px">
+      <button onClick="{{ setClosed }}" style="{{ closedTabStyle }}">Closed · cover screen</button>
+      <button onClick="{{ setOpen }}" style="{{ openTabStyle }}">Unfolded · inner screen</button>
+    </div>
+    <button onClick="{{ toggleLock }}" style="{{ lockBtnStyle }}">{{ lockBtnLabel }}</button>
+    <div style="flex:1"></div>
+    <a href="Notch HUD.dc.html" style="font-size:12px;color:#8a8a94;text-decoration:none">← Mac version</a>
+    <button onClick="{{ toggleSettings }}" style="{{ settingsBtnStyle }}">Settings</button>
+  </div>
+
+  <div style="display:flex;gap:24px;padding:20px;flex-wrap:wrap;align-items:flex-start">
+    <div style="flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px">
+
+      <!-- phone -->
+      <div style="display:flex;justify-content:center">
+        <div style="{{ phoneStyle }}">
+          <sc-if value="{{ isOpen }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.14),rgba(255,255,255,0));pointer-events:none"></div></sc-if>
+
+          <!-- status bar -->
+          <div style="{{ statusStyle }}">
+            <span style="font-family:'IBM Plex Mono',monospace;{{ statusLeftStyle }}">{{ clock }}</span>
+            <sc-if value="{{ isOpen }}" hint-placeholder-val="{{ false }}"><span style="flex:1"></span></sc-if>
+            <span style="display:flex;gap:6px;align-items:center;font-size:10px;{{ statusRightStyle }}"><span>5G</span><span>▮▮▮</span><span>{{ battery }}</span></span>
+          </div>
+
+          <!-- lock screen -->
+          <sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding-top:22%;gap:6px;pointer-events:none;animation:hudFade .25s ease">
+              <div style="font-size:13px;color:rgba(255,255,255,.75)">{{ dateLabel }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:56px;line-height:1;color:#fff;letter-spacing:-2px">{{ clockBig }}</div>
+              <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px;width:70%;max-width:280px">
+                <sc-for list="{{ lockNotifs }}" as="n" hint-placeholder-count="2">
+                  <div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.14);backdrop-filter:blur(20px)">
+                    <div style="{{ n.iconStyle }}">{{ n.glyph }}</div>
+                    <div style="min-width:0"><div style="font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.title }}</div><div style="font-size:11px;color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.body }}</div></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="position:absolute;bottom:26px;font-size:11px;color:rgba(255,255,255,.6)">Swipe up to unlock</div>
+            </div>
+          </sc-if>
+
+          <!-- home content -->
+          <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ true }}">
+            <div style="{{ homeGridStyle }}">
+              <sc-for list="{{ homeIcons }}" as="i" hint-placeholder-count="8"><div style="{{ i.style }}"></div></sc-for>
+            </div>
+            <div style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:36%;height:4px;border-radius:2px;background:rgba(255,255,255,.5)"></div>
+          </sc-if>
+
+          <!-- camera cutout -->
+          <div style="{{ cutoutStyle }}"></div>
+
+          <!-- island -->
+          <div style="{{ islandWrapStyle }}">
+            <div style="{{ islandStyle }}" onMouseDown="{{ pressStart }}" onMouseUp="{{ pressEnd }}" onMouseLeave="{{ pressCancel }}" onTouchStart="{{ pressStart }}" onTouchEnd="{{ pressEnd }}" data-island="1">
+              <div style="{{ glowStyle }}"></div>
+
+              <!-- LOCKED -->
+              <sc-if value="{{ v.locked }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;height:100%;padding:0 12px;position:relative">
+                  <div style="{{ leftWingStyle }}">
+                    <div style="{{ lockGlyphStyle }}">
+                      <div style="{{ shackleStyle }}"></div>
+                      <div style="width:11px;height:8px;border-radius:2px;background:#fff"></div>
+                    </div>
+                  </div>
+                  <div style="{{ cutoutGapStyle }}"></div>
+                  <div style="{{ rightWingStyle }}">
+                    <sc-if value="{{ lockHasText }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;color:#fff;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lockText }}</span></sc-if>
+                    <sc-if value="{{ lockNoText }}" hint-placeholder-val="{{ true }}"><div style="{{ lockDotStyle }}"></div></sc-if>
+                  </div>
+                </div>
+              </sc-if>
+
+              <!-- COMPACT -->
+              <sc-if value="{{ v.compact }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;align-items:center;height:100%;padding:0 12px;position:relative">
+                  <div style="{{ leftWingStyle }}">
+                    <div style="{{ leftDotStyle }}"></div>
+                    <span style="font-size:11.5px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ leftLabel }}</span>
+                  </div>
+                  <div style="{{ cutoutGapStyle }}"></div>
+                  <div style="{{ rightWingStyle }}">
+                    <span style="font-size:11.5px;font-weight:500;color:#d8d8de;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ rightLabel }}</span>
+                    <sc-if value="{{ showBars }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;gap:2px;align-items:flex-end;height:14px">
+                        <div style="width:3px;border-radius:1px;background:{{ accent }};animation:hudBars 1s ease-in-out infinite"></div>
+                        <div style="width:3px;border-radius:1px;background:{{ accent }};animation:hudBars 1s ease-in-out .2s infinite"></div>
+                        <div style="width:3px;border-radius:1px;background:{{ accent }};animation:hudBars 1s ease-in-out .4s infinite"></div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+
+              <!-- DETAIL (tap) -->
+              <sc-if value="{{ v.detail }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;position:relative;animation:hudFade .2s ease">
+                  <div style="{{ cutoutRowStyle }}"></div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 14px 14px">
+                    <div style="{{ detailArtStyle }}">{{ detailGlyph }}</div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ detailTitle }}</div>
+                      <div style="font-size:11px;color:#9a9aa4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ detailSub }}</div>
+                      <sc-if value="{{ detailHasMeter }}" hint-placeholder-val="{{ false }}"><div style="margin-top:7px;height:3px;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden"><div style="{{ detailMeterStyle }}"></div></div></sc-if>
+                    </div>
+                    <sc-for list="{{ detailActions }}" as="a" hint-placeholder-count="2">
+                      <button onClick="{{ a.fn }}" onMouseDown="{{ swallow }}" onTouchStart="{{ swallow }}" style="{{ a.style }}">{{ a.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <!-- EXPANDED (hold) -->
+              <sc-if value="{{ v.expanded }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:10px;position:relative;animation:hudFade .22s cubic-bezier(.2,.8,.2,1)" onMouseDown="{{ swallow }}" onTouchStart="{{ swallow }}">
+                  <div style="{{ cutoutRowStyle }}"></div>
+                  <div style="display:flex;align-items:center;gap:4px;padding:0 10px;overflow-x:auto;scrollbar-width:none">
+                    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+                      <button onClick="{{ t.pick }}" style="{{ t.style }}"><span style="font-size:13px;line-height:1;width:14px;text-align:center">{{ t.glyph }}</span><sc-if value="{{ t.active }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px;font-weight:500;white-space:nowrap">{{ t.label }}</span></sc-if><sc-if value="{{ t.hasCount }}" hint-placeholder-val="{{ false }}"><span style="{{ t.countStyle }}">{{ t.count }}</span></sc-if></button>
+                    </sc-for>
+                    <span style="flex:1"></span>
+                    <button onClick="{{ toggleQuiet }}" style="{{ quietBtnStyle }}">◗</button>
+                  </div>
+                  <div style="padding:0 12px 12px;display:flex;flex-direction:column;gap:8px">
+
+                    <sc-if value="{{ tab.overview }}" hint-placeholder-val="{{ true }}">
+                      <sc-if value="{{ showApproval }}" hint-placeholder-val="{{ false }}">
+                        <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid #f59a3a55;display:flex;flex-direction:column;gap:8px">
+                          <div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#f59a3a;box-shadow:0 0 10px #f59a3a;animation:hudGlow 1.6s ease-in-out infinite"></div><span style="font-size:12.5px;font-weight:500;color:#fff">{{ approval.name }}</span><span style="font-size:11px;color:#9a9aa4">· {{ approval.project }}</span><span style="flex:1"></span><span style="font-size:10px;font-weight:600;letter-spacing:.5px;color:#f59a3a">NEEDS YOU</span></div>
+                          <div style="font-size:12px;color:#d8d8de">{{ approval.ask }}</div>
+                          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff;background:rgba(255,255,255,.08);border-radius:6px;padding:6px 10px;align-self:flex-start">$ {{ approval.command }}</div>
+                          <div style="display:flex;gap:8px;justify-content:flex-end"><button onClick="{{ approval.deny }}" style="font:inherit;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.1);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">Deny</button><button onClick="{{ approval.approve }}" style="font:inherit;font-size:11.5px;font-weight:600;background:#fff;color:#111;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">Approve</button></div>
+                        </div>
+                      </sc-if>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                        <sc-if value="{{ show.agents }}" hint-placeholder-val="{{ true }}"><div onClick="{{ goAgents }}" style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);display:flex;flex-direction:column;gap:4px;cursor:pointer"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94">Agents</div><div style="display:flex;align-items:center;gap:8px"><div style="{{ agentDotStyle }}"></div><span style="font-size:12.5px;font-weight:500;color:#fff">{{ agentSummary }}</span></div></div></sc-if>
+                        <sc-if value="{{ show.weather }}" hint-placeholder-val="{{ true }}"><div onClick="{{ goWeather }}" style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);display:flex;flex-direction:column;gap:4px;cursor:pointer"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94">Weather</div><div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:18px;color:#fff">{{ weatherTemp }}</span><span style="font-size:11.5px;color:#d8d8de">{{ weather.cond }}</span></div></div></sc-if>
+                        <sc-if value="{{ show.meetings }}" hint-placeholder-val="{{ true }}"><div onClick="{{ goCalendar }}" style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);display:flex;flex-direction:column;gap:4px;cursor:pointer"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94">Next</div><div style="display:flex;align-items:center;justify-content:space-between;gap:6px"><span style="font-size:12.5px;font-weight:500;color:#fff;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ meeting.title }}</span><button onClick="{{ joinMeeting }}" style="font:inherit;font-size:10.5px;font-weight:600;background:#3d8bff;color:#fff;border:0;border-radius:6px;padding:4px 9px;cursor:pointer">Join</button></div></div></sc-if>
+                        <sc-if value="{{ show.sports }}" hint-placeholder-val="{{ true }}"><div onClick="{{ goSports }}" style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);display:flex;flex-direction:column;gap:4px;cursor:pointer"><div style="display:flex;justify-content:space-between;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94"><span>{{ game.league }}</span><span style="color:#ff6b6b">● {{ game.period }}</span></div><div style="font-size:12.5px;font-weight:500;color:#fff">{{ game.home }} <span style="font-family:'IBM Plex Mono',monospace">{{ game.homeScore }}</span> – <span style="font-family:'IBM Plex Mono',monospace">{{ game.awayScore }}</span> {{ game.away }}</div></div></sc-if>
+                      </div>
+                      <sc-if value="{{ show.media }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05)">
+                          <div style="{{ artStyle }}"></div>
+                          <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ media.title }}</div><div style="font-size:11px;color:#9a9aa4">{{ media.artist }}</div><div style="margin-top:6px;height:3px;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden"><div style="{{ mediaProgressStyle }}"></div></div></div>
+                          <div style="display:flex;gap:6px"><button onClick="{{ mediaPrev }}" style="{{ mediaBtnStyle }}">‹‹</button><button onClick="{{ mediaToggle }}" style="{{ mediaBtnStyle }}">{{ mediaPlayGlyph }}</button><button onClick="{{ mediaNext }}" style="{{ mediaBtnStyle }}">››</button></div>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ show.bookmarks }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+                          <sc-for list="{{ bookmarks }}" as="b" hint-placeholder-count="5"><button onClick="{{ b.open }}" style="font:inherit;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 4px;border-radius:10px;border:0;background:rgba(255,255,255,.05);color:#fff;cursor:pointer"><div style="{{ b.tileStyle }}">{{ b.initial }}</div><span style="font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">{{ b.label }}</span></button></sc-for>
+                        </div>
+                      </sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ tab.agents }}" hint-placeholder-val="{{ false }}">
+                      <sc-for list="{{ agents }}" as="a" hint-placeholder-count="2">
+                        <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);display:flex;flex-direction:column;gap:8px">
+                          <div style="display:flex;align-items:center;gap:10px"><div style="{{ a.dotStyle }}"></div><div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:500;color:#fff">{{ a.name }} <span style="font-weight:400;color:#9a9aa4">· {{ a.project }}</span></div><div style="font-size:11px;color:#9a9aa4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.task }}</div></div><span style="{{ a.badgeStyle }}">{{ a.stateLabel }}</span></div>
+                          <sc-if value="{{ a.needsApproval }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff;background:rgba(255,255,255,.08);border-radius:6px;padding:6px 10px;align-self:flex-start">$ {{ a.command }}</div><div style="display:flex;gap:8px;justify-content:flex-end"><button onClick="{{ a.deny }}" style="font:inherit;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.1);color:#fff;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">Deny</button><button onClick="{{ a.approve }}" style="font:inherit;font-size:11.5px;font-weight:600;background:#fff;color:#111;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">Approve</button></div></sc-if>
+                        </div>
+                      </sc-for>
+                      <div style="font-size:10.5px;color:#7a7a84;padding:0 2px">Agent status is pushed from your Mac over the companion link.</div>
+                    </sc-if>
+
+                    <sc-if value="{{ tab.inbox }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;justify-content:space-between;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94"><span>Inbox · {{ notifCount }}</span><button onClick="{{ clearNotifs }}" style="font:inherit;font-size:10px;letter-spacing:.8px;text-transform:uppercase;background:none;border:0;color:#8a8a94;cursor:pointer;padding:0">Clear all</button></div>
+                      <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.05)"><div style="{{ n.iconStyle }}">{{ n.glyph }}</div><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.title }}</div><div style="font-size:11px;color:#9a9aa4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.body }}</div></div><span style="font-size:10px;color:#7a7a84;font-family:'IBM Plex Mono',monospace">{{ n.time }}</span></div>
+                      </sc-for>
+                      <sc-if value="{{ noNotifs }}" hint-placeholder-val="{{ false }}"><div style="font-size:11.5px;color:#7a7a84;padding:6px 10px">All caught up.</div></sc-if>
+                    </sc-if>
+
+                    <sc-if value="{{ tab.calendar }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94">{{ todayLabel }}</div>
+                      <sc-for list="{{ events }}" as="e" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:10px;padding:6px 0"><span style="{{ e.timeStyle }}">{{ e.time }}</span><div style="width:2px;align-self:stretch;border-radius:1px;background:{{ e.color }}"></div><div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.title }}</div><div style="font-size:10.5px;color:#7a7a84">{{ e.meta }}</div></div><sc-if value="{{ e.joinable }}" hint-placeholder-val="{{ false }}"><button onClick="{{ e.join }}" style="font:inherit;font-size:11px;font-weight:600;background:#3d8bff;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer">Join</button></sc-if></div>
+                      </sc-for>
+                    </sc-if>
+
+                    <sc-if value="{{ tab.weather }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:12px"><div style="{{ weatherIconStyle }}"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:34px;line-height:1;color:#fff">{{ weatherTemp }}</div><div><div style="font-size:12.5px;font-weight:500;color:#fff">{{ weather.cond }}</div><div style="font-size:10.5px;color:#9a9aa4">{{ weather.city }} · Feels like {{ weatherFeels }}</div></div></div>
+                      <div style="display:flex;gap:12px;font-size:10.5px;color:#9a9aa4"><span>H {{ weather.hi }}° · L {{ weather.lo }}°</span><span>{{ weather.humidity }}% humidity</span><span>{{ weather.wind }} wind</span></div>
+                      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08)">
+                        <sc-for list="{{ hourly }}" as="h" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;align-items:center;gap:5px"><span style="font-size:10px;color:#7a7a84">{{ h.label }}</span><div style="{{ h.iconStyle }}"></div><span style="font-size:9.5px;color:#7fb2ff;height:10px">{{ h.precip }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#fff">{{ h.temp }}</span></div></sc-for>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ tab.sports }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05)">
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:12px;font-weight:500;color:#fff">{{ game.home }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:26px;color:#fff">{{ game.homeScore }}</span></div>
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94">{{ game.league }}</span><span style="font-size:11px;color:#ff6b6b">● {{ game.period }}</span></div>
+                        <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><span style="font-size:12px;font-weight:500;color:#fff">{{ game.away }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:26px;color:#fff">{{ game.awayScore }}</span></div>
+                      </div>
+                      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#8a8a94">{{ sportsModeLabel }}</div>
+                      <sc-for list="{{ plays }}" as="p" hint-placeholder-count="3"><div style="{{ p.rowStyle }}"><span style="{{ p.clockStyle }}">{{ p.clock }}</span><span style="line-height:1.35;flex:1">{{ p.text }}</span></div></sc-for>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <!-- split secondary bubble -->
+            <sc-if value="{{ showBubble }}" hint-placeholder-val="{{ false }}">
+              <div style="{{ bubbleStyle }}"><span style="font-size:11px;color:#fff;font-family:'IBM Plex Mono',monospace">{{ bubbleText }}</span></div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;font-size:11px;color:#6f6f78">Tap the island for details · hold {{ holdLabel }} to expand · tap outside to dismiss</div>
+
+      <!-- triggers -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78">Simulate</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onClick="{{ evAgentRun }}" style="{{ trigStyle }}"><span style="width:7px;height:7px;border-radius:50%;background:#3d8bff;display:inline-block"></span>Agent running</button>
+          <button onClick="{{ evAgentPerm }}" style="{{ trigStyle }}"><span style="width:7px;height:7px;border-radius:50%;background:#f59a3a;display:inline-block"></span>Permission needed</button>
+          <button onClick="{{ evAgentDone }}" style="{{ trigStyle }}"><span style="width:7px;height:7px;border-radius:50%;background:#34d27a;display:inline-block"></span>Agent done</button>
+          <button onClick="{{ evTimer }}" style="{{ trigStyle }}">{{ timerBtnLabel }}</button>
+          <button onClick="{{ evMediaToggle }}" style="{{ trigStyle }}">{{ mediaBtnLabel }}</button>
+          <button onClick="{{ evCall }}" style="{{ trigStyle }}">Incoming call</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onClick="{{ evScore }}" style="{{ trigStyle }}">Scoring play</button>
+          <button onClick="{{ evPlay }}" style="{{ trigStyle }}">Non-scoring play</button>
+          <button onClick="{{ evTeams }}" style="{{ trigStyle }}">Teams message</button>
+          <button onClick="{{ evSMS }}" style="{{ trigStyle }}">Text message</button>
+          <button onClick="{{ evEmail }}" style="{{ trigStyle }}">Outlook email</button>
+          <button onClick="{{ evMeeting }}" style="{{ trigStyle }}">Meeting in 5 min</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onClick="{{ evBuds }}" style="{{ trigStyle }}">Buds connected</button>
+          <button onClick="{{ evCharge }}" style="{{ trigStyle }}">Charger plugged in</button>
+          <button onClick="{{ evSilent }}" style="{{ trigStyle }}">{{ silentBtnLabel }}</button>
+          <button onClick="{{ evVolume }}" style="{{ trigStyle }}">Volume</button>
+          <button onClick="{{ evCopy }}" style="{{ trigStyle }}">Copied text</button>
+          <button onClick="{{ evNav }}" style="{{ trigStyle }}">Navigation step</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- settings -->
+    <sc-if value="{{ settingsOpen }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:0 0 320px;max-width:100%;background:#14141a;border:1px solid #23232b;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:18px;animation:hudFade .2s ease">
+      <div><div style="font-size:14px;font-weight:600">Settings</div><div style="font-size:12px;color:#8a8a94;margin-top:2px">Island behavior and modules.</div></div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78">Island size</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ sizeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div>
+        <div style="font-size:11px;color:#8a8a94">Pill width fits its content and is capped by this setting; Minimal also trims height slightly.</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78;margin-top:10px">Gestures</div>
+        <div style="font-size:11px;color:#8a8a94">Hold to expand</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ holdOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div>
+        <sc-for list="{{ gestureRows }}" as="m" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:9px;background:#1a1a21"><div style="min-width:0"><div style="font-size:12.5px;font-weight:500">{{ m.label }}</div><div style="font-size:11px;color:#8a8a94">{{ m.desc }}</div></div><div onClick="{{ m.toggle }}" style="{{ m.trackStyle }}"><div style="{{ m.knobStyle }}"></div></div></div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78">Lock screen</div>
+        <sc-for list="{{ lockRows }}" as="m" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:9px;background:#1a1a21"><div style="min-width:0"><div style="font-size:12.5px;font-weight:500">{{ m.label }}</div><div style="font-size:11px;color:#8a8a94">{{ m.desc }}</div></div><div onClick="{{ m.toggle }}" style="{{ m.trackStyle }}"><div style="{{ m.knobStyle }}"></div></div></div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78">Modules</div>
+        <sc-for list="{{ moduleRows }}" as="m" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:9px;background:#1a1a21"><div style="min-width:0"><div style="font-size:12.5px;font-weight:500">{{ m.label }}</div><div style="font-size:11px;color:#8a8a94">{{ m.desc }}</div></div><div onClick="{{ m.toggle }}" style="{{ m.trackStyle }}"><div style="{{ m.knobStyle }}"></div></div></div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78">Sports — live updates</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ sportsModes }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78;margin-top:6px">Leagues</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ leagueChips }}" as="t" hint-placeholder-count="5"><button onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78;margin-top:6px">Teams</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ teamChips }}" as="t" hint-placeholder-count="5"><button onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6f6f78">Light theme</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ lightThemes }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.pick }}" style="{{ t.style }}"><span style="{{ t.swatch }}"></span>{{ t.label }}</button></sc-for></div>
+        <div style="font-size:11px;color:#8a8a94">Quiet mode, breakthrough rules and bookmarks are shared with the Mac app via the companion link.</div>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:960}}">
+class Component extends DCLogic {
+  state = {
+    fold: 'closed', locked: true, unlocking: false, settingsOpen: true,
+    view: 'compact', tab: 'overview', pressing: false, bounce: 0,
+    holdMs: 400, size: 'compact', gestures: { tapDetail: true, haptics: true, splitIsland: true },
+    lockOpts: { showOnLock: true, hideContentOnLock: true, unlockAnim: true },
+    lightTheme: 'aurora', quiet: false,
+    show: { agents: true, media: true, timer: true, calls: true, meetings: true, sports: true, weather: true, messages: true, teams: true, email: true, bookmarks: true, system: true },
+    agents: [
+      { id: 1, name: 'Claude Code', project: 'studio', task: 'Refactoring auth middleware', state: 'running', ask: 'Claude wants to apply and build the changes.', command: 'npm run build' },
+      { id: 2, name: 'Codex', project: 'api', task: 'Writing tests for /api/users', state: 'done', ask: '', command: '' },
+    ],
+    media: { title: 'Nightcall', artist: 'Kavinsky', playing: false, progress: 0.42 },
+    timer: { running: false, seconds: 0 },
+    call: null, transient: null,
+    meeting: { title: 'Design sync', when: 'Today · 2:00 PM · Teams' },
+    events: [{ id: 1, time: '14:00', title: 'Design sync', meta: 'Teams · 45 min', color: '#3d8bff', joinable: true }, { id: 2, time: '18:30', title: 'Dinner with Lea', meta: 'Personal', color: '#8a5cf6', joinable: false }],
+    game: { league: 'NBA', home: 'LAL', away: 'BOS', homeScore: 98, awayScore: 94, period: 'Q4 3:12' },
+    plays: [{ id: 1, clock: 'Q4 3:12', text: 'LeBron James makes 26-ft three (Reaves assists)', scoring: true }, { id: 2, clock: 'Q4 3:31', text: 'Jayson Tatum misses 15-ft pullup', scoring: false }],
+    sportsMode: 'scoring', sportsLeagues: { NFL: true, NBA: true, MLB: false, NHL: false, NCAAF: false, MLS: false, EPL: false },
+    sportsTeams: { Lakers: true, Celtics: false, Warriors: false, Chiefs: true, Eagles: false, Cowboys: false },
+    weather: { temp: 72, feels: 74, hi: 78, lo: 61, cond: 'Partly cloudy', city: 'Austin', humidity: 54, wind: '9 mph', unit: 'F', hourly: [[72, 'sun', ''], [73, 'sun', ''], [71, 'cloud', '10%'], [68, 'rain', '40%'], [65, 'moon', ''], [63, 'moon', '']] },
+    notifs: [{ id: 1, kind: 'teams', title: 'Design team', body: 'Marco: pushed the new tokens', time: '9:05' }, { id: 2, kind: 'email', title: 'Sarah Kim (Outlook)', body: 'Re: Q4 roadmap — one note', time: '9:12' }],
+    bookmarks: [{ id: 1, label: 'Gmail', url: 'mail.google.com', color: '#ea4335' }, { id: 2, label: 'Reddit', url: 'reddit.com', color: '#ff4500' }, { id: 3, label: 'GitHub', url: 'github.com', color: '#8b949e' }, { id: 4, label: 'ESPN', url: 'espn.com', color: '#d00' }, { id: 5, label: 'YouTube', url: 'youtube.com', color: '#ff0033' }],
+    silent: false, volume: 0.6, battery: 82, charging: false,
+    now: new Date(),
+  };
+  themes = {
+    aurora: { running: '#3d8bff', permission: '#f59a3a', done: '#34d27a', error: '#ff5a5a', accent: '#7fb2ff' },
+    ember: { running: '#ff7a3d', permission: '#ffd23d', done: '#7ee08a', error: '#ff4d6d', accent: '#ffb38a' },
+    mono: { running: '#ffffff', permission: '#c9c9c9', done: '#8f8f8f', error: '#ff5a5a', accent: '#ffffff' },
+    candy: { running: '#c77dff', permission: '#ff8fab', done: '#5ce1e6', error: '#ff5a5a', accent: '#e0aaff' },
+  };
+  componentDidMount() {
+    this.onDocDown = (e) => { if (!e.target.closest('[data-island]') && this.state.view !== 'compact') this.setState({ view: 'compact' }); };
+    document.addEventListener('mousedown', this.onDocDown); document.addEventListener('touchstart', this.onDocDown);
+    this.tick = setInterval(() => this.setState(s => {
+      const n = { now: new Date() };
+      if (s.timer.running) n.timer = { ...s.timer, seconds: s.timer.seconds + 1 };
+      if (s.media.playing) n.media = { ...s.media, progress: (s.media.progress + 0.004) % 1 };
+      return n;
+    }), 1000);
+  }
+  componentWillUnmount() { document.removeEventListener('mousedown', this.onDocDown); document.removeEventListener('touchstart', this.onDocDown); clearInterval(this.tick); clearTimeout(this.holdT); clearTimeout(this.transT); clearTimeout(this.unlockT); }
+
+  bounce() { this.setState(s => ({ bounce: s.bounce + 1 })); }
+  transient(t, ms = 2200) { clearTimeout(this.transT); this.setState({ transient: t, view: 'compact' }); this.bounce(); this.transT = setTimeout(() => this.setState({ transient: null }), ms); }
+  setAgent(id, patch) { this.setState(s => ({ agents: s.agents.map(a => a.id === id ? { ...a, ...patch } : a) })); this.bounce(); }
+  pushNotif(n) { this.setState(s => ({ notifs: [{ ...n, id: Date.now(), time: this.fmt(new Date()) }, ...s.notifs].slice(0, 5) })); }
+  fmt(d) { const h = d.getHours() % 12 || 12, m = String(d.getMinutes()).padStart(2, '0'); return `${h}:${m}`; }
+  mmss(sec) { return `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`; }
+  unlock() {
+    if (!this.state.locked) return;
+    this.setState({ unlocking: true });
+    clearTimeout(this.unlockT);
+    this.unlockT = setTimeout(() => this.setState({ locked: false, unlocking: false, bounce: this.state.bounce + 1 }), this.state.lockOpts.unlockAnim ? 700 : 0);
+  }
+
+  renderVals() {
+    const s = this.state, th = this.themes[s.lightTheme];
+    const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+    const swallow = (e) => e.stopPropagation();
+    const isOpen = s.fold === 'open';
+    const running = s.agents.filter(a => a.state === 'running').length, perm = s.agents.filter(a => a.state === 'permission').length, err = s.agents.filter(a => a.state === 'error').length;
+    const agentState = perm ? 'permission' : err ? 'error' : running ? 'running' : 'done';
+
+    // ---- primary live activity
+    const t = s.transient;
+    let act;
+    if (s.call) act = { kind: 'call', left: s.call.name, right: 'Incoming', glyph: '☎', color: th.done, title: s.call.name, sub: `${s.call.app} · incoming call`, actions: [['Decline', '#ff5a5a', '#fff', () => this.setState({ call: null, view: 'compact' })], ['Accept', '#34d27a', '#04200f', () => { this.setState({ call: null, view: 'compact' }); this.transient({ left: s.call.name, right: 'On call', color: th.done }, 2500); }]] };
+    else if (t) act = { kind: 'transient', left: t.left, right: t.right, color: t.color || th.accent, meter: t.meter, title: t.left, sub: t.right, glyph: t.glyph || '•', actions: [] };
+    else if (perm && s.show.agents) { const a = s.agents.find(x => x.state === 'permission'); act = { kind: 'agent', left: a.name, right: 'Needs you', color: th.permission, glyph: '✳', title: a.name, sub: a.ask, actions: [['Deny', 'rgba(255,255,255,.12)', '#fff', () => this.setAgent(a.id, { state: 'error', task: 'Denied' })], ['Approve', '#fff', '#111', () => { this.setAgent(a.id, { state: 'running', task: `Running: ${a.command}` }); this.setState({ view: 'compact' }); }]] }; }
+    else if (s.timer.running && s.show.timer) act = { kind: 'timer', left: 'Timer', right: this.mmss(s.timer.seconds), color: th.permission, glyph: '◔', title: 'Timer', sub: this.mmss(s.timer.seconds), actions: [['Stop', 'rgba(255,255,255,.12)', '#fff', () => this.setState({ timer: { running: false, seconds: 0 }, view: 'compact' })]] };
+    else if (s.media.playing && s.show.media) act = { kind: 'media', left: s.media.title, right: '', bars: true, color: th.accent, glyph: '♫', title: s.media.title, sub: s.media.artist, meter: s.media.progress, actions: [['❙❙', 'rgba(255,255,255,.12)', '#fff', () => this.setState(st => ({ media: { ...st.media, playing: false } }))], ['››', 'rgba(255,255,255,.12)', '#fff', () => this.nextTrack()]] };
+    else if (s.show.sports && s.sportsMode !== 'score' && s.plays[0] && s.sportsMode === 'pbp') act = { kind: 'sports', left: `${s.game.home} ${s.game.homeScore}–${s.game.awayScore} ${s.game.away}`, right: s.plays[0].text, color: '#ff6b6b', glyph: '●', title: `${s.game.home} ${s.game.homeScore} – ${s.game.awayScore} ${s.game.away}`, sub: `${s.game.period} · ${s.plays[0].text}`, actions: [] };
+    else if (s.show.sports) act = { kind: 'sports', left: `${s.game.home} ${s.game.homeScore}`, right: `${s.game.awayScore} ${s.game.away}`, color: '#ff6b6b', glyph: '●', title: `${s.game.home} ${s.game.homeScore} – ${s.game.awayScore} ${s.game.away}`, sub: `${s.game.league} · ${s.game.period}`, actions: [] };
+    else if (running && s.show.agents) act = { kind: 'agent', left: `${running} agent${running > 1 ? 's' : ''}`, right: 'Running', color: th.running, glyph: '✳', title: 'Agents', sub: s.agents.find(a => a.state === 'running').task, actions: [] };
+    else act = { kind: 'idle', left: '', right: '', color: th[agentState], glyph: '•', title: 'Nothing live', sub: 'Hold to open', actions: [] };
+
+    // secondary bubble (split island)
+    let bubble = null;
+    if (s.gestures.splitIsland && act.kind !== 'idle') {
+      if (act.kind !== 'timer' && s.timer.running) bubble = this.mmss(s.timer.seconds);
+      else if (act.kind !== 'media' && s.media.playing) bubble = '♫';
+      else if (act.kind !== 'sports' && act.kind !== 'call' && s.show.sports) bubble = `${s.game.homeScore}–${s.game.awayScore}`;
+    }
+
+    // ---- view
+    const showIsland = !s.locked || s.lockOpts.showOnLock;
+    const view = s.locked ? 'locked' : s.view;
+    const v = { locked: view === 'locked', compact: view === 'compact', detail: view === 'detail', expanded: view === 'expanded' };
+    const glow = s.locked ? (s.unlocking ? th.done : '#8a8a94') : s.quiet && act.kind === 'idle' ? '#8a5cf6' : act.color;
+
+    // ---- geometry (CSS px in the mock)
+    const bezel = isOpen ? 7 : 8;
+    const screenW = (isOpen ? 560 : 300) - bezel * 2, screenH = (isOpen ? 470 : 660) - bezel * 2;
+    const cutX = isOpen ? 0.75 : 0.5, cutY = 22, cutD = isOpen ? 11 : 10;
+    const idle = act.kind === 'idle' && !s.locked;
+    const lockHasText = !s.unlocking && !s.lockOpts.hideContentOnLock && act.kind !== 'idle';
+    const sz = { minimal: 0.8, compact: 1, roomy: 1.2 }[s.size] || 1;
+    const lockedW = lockHasText ? 170 * sz : 36 + cutD + 30;
+    const hasBubble = !!bubble && !s.locked;
+    // content-fitted width: estimate from label length, clamp to a per-size range
+    // symmetric around the cutout: both wings sized to the longer label
+    const longest = Math.max(act.left.length, act.bars ? 4 : act.right.length);
+    const est = longest * 2 * 5.8 + cutD + 12 + 24 + 24;
+    const bubbleWEst = hasBubble ? Math.max(34, 14 + bubble.length * 7.5) : 0;
+    const minW = isOpen ? 150 : 140, maxW = Math.min((isOpen ? 260 : hasBubble ? 176 : 220) * sz, hasBubble ? screenW - 16 - 6 - bubbleWEst : 999);
+    const compactW = s.locked ? lockedW : idle ? 36 + cutD + 12 : Math.round(Math.max(minW * sz, Math.min(est, maxW)));
+    const islandW = v.expanded ? Math.min(isOpen ? 400 : 284, screenW - 16) : v.detail ? Math.min((isOpen ? 330 : 264) * Math.min(sz, 1.05), screenW - 16) : compactW;
+    const pillH = Math.round(34 * (s.size === 'minimal' ? 0.9 : 1));
+    const islandH = v.compact || v.locked ? pillH : 'auto';
+    const cx = screenW * cutX;
+    let left = cx - islandW / 2; left = Math.max(8, Math.min(left, screenW - islandW - 8));
+    const bubbleW = Math.max(34, 14 + (bubble || '').length * 7.5);
+    let bubbleLeft = left + islandW + 6;
+    if (hasBubble && v.compact) {
+      const groupW = islandW + 6 + bubbleW;
+      if (bubbleLeft + bubbleW > screenW - 8) {
+        // no room on the right → left side; shift the whole group right if needed so both keep an 8px margin
+        if (left - 6 - bubbleW < 8) left = Math.min(8 + bubbleW + 6, screenW - islandW - 8);
+        bubbleLeft = left - 6 - bubbleW;
+        if (groupW > screenW - 16) bubbleLeft = Math.max(8, bubbleLeft);
+      }
+    }
+    const bubbleOverClock = hasBubble && v.compact && bubbleLeft < 60;
+    const cutInIsland = cx - left; // x of cutout relative to island
+    const bounceAnim = s.bounce ? `islandBounce .6s cubic-bezier(.2,.8,.2,1) ${s.bounce}` : 'none';
+    const islandStyle = `position:absolute;left:${left}px;top:${cutY - 17 + cutD / 2}px;width:${islandW}px;height:${typeof islandH === 'number' ? islandH + 'px' : islandH};min-height:34px;background:#000;border-radius:${v.compact || v.locked ? 17 : 22}px;overflow:hidden;cursor:pointer;user-select:none;transition:width .32s cubic-bezier(.2,.8,.2,1),left .32s cubic-bezier(.2,.8,.2,1),border-radius .32s;box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.05),0 0 22px ${glow}55;animation:${s.pressing ? 'islandPress .4s ease forwards' : s.bounce ? 'islandBounce .6s cubic-bezier(.2,.8,.2,1)' : 'none'};opacity:${showIsland ? 1 : 0}`;
+    // gap element sits where the cutout is; we position content around it via a spacer with margin-left auto
+    const gapW = cutD + 12;
+    const leftWingW = Math.max(40, cutInIsland - gapW / 2 - 12);
+    const cutoutGapStyle = `width:${gapW}px;flex:none`;
+    const leftWingStyle = `display:flex;align-items:center;gap:7px;min-width:0;flex:0 0 ${leftWingW}px`;
+    const rightWingStyle = `display:flex;align-items:center;gap:6px;min-width:0;flex:1 1 0;justify-content:flex-end`;
+    const cutoutRowStyle = `height:${cutY - (cutY - 17 + cutD / 2) + cutD / 2 + 6}px`;
+    const glowStyle = `position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,${glow},transparent);animation:hudGlow 2.2s ease-in-out infinite;opacity:.9;pointer-events:none`;
+    const dot = (c, pulse) => `width:8px;height:8px;border-radius:50%;flex:none;background:${c};box-shadow:0 0 10px ${c};${pulse ? 'animation:hudGlow 1.6s ease-in-out infinite' : ''}`;
+
+    // compact content: left occupies left half, right occupies right half of island around cutout
+    const leftLabel = act.left, rightLabel = act.bars ? '' : act.right;
+
+    // ---- press handling
+    const pressStart = (e) => {
+      if (e.type === 'mousedown' && e.button !== 0) return;
+      if (s.locked) { this.setState({ pressing: true }); return; }
+      this.setState({ pressing: true });
+      clearTimeout(this.holdT);
+      this.holdT = setTimeout(() => this.setState({ view: 'expanded', pressing: false, tab: 'overview' }), s.holdMs);
+    };
+    const pressEnd = (e) => {
+      if (!s.pressing) return;
+      clearTimeout(this.holdT);
+      if (s.locked) { this.setState({ pressing: false }); this.unlock(); return; }
+      if (s.view === 'expanded') { this.setState({ pressing: false }); return; }
+      const next = s.view === 'detail' ? 'compact' : (s.gestures.tapDetail && act.kind !== 'idle' ? 'detail' : s.view);
+      this.setState({ pressing: false, view: next });
+    };
+    const pressCancel = () => { if (s.pressing) { clearTimeout(this.holdT); this.setState({ pressing: false }); } };
+
+    // ---- tabs
+    const notifs = s.notifs.filter(n => (n.kind === 'email' && s.show.email) || (n.kind === 'teams' && s.show.teams) || (n.kind === 'sms' && s.show.messages) || !['email', 'teams', 'sms'].includes(n.kind));
+    const tabDefs = [['overview', 'Overview', '▦', 0, true], ['agents', 'Agents', '✳', perm + running, s.show.agents], ['inbox', 'Inbox', '✉', notifs.length, s.show.email || s.show.teams || s.show.messages], ['calendar', 'Calendar', '▤', s.events.length, s.show.meetings], ['weather', 'Weather', '☼', 0, s.show.weather], ['sports', 'Sports', '●', 0, s.show.sports]];
+    const tabs = tabDefs.filter(x => x[4]).map(([k, label, glyph, count]) => { const on = s.tab === k; return { label, glyph, count, hasCount: count > 0, active: on, pick: stop(() => this.setState({ tab: k })), style: `font:inherit;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 ${on ? 10 : 8}px;border-radius:9px;border:0;cursor:pointer;background:${on ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.06)'};color:${on ? '#fff' : '#b8b8c2'};flex:none`, countStyle: `font-family:'IBM Plex Mono',monospace;font-size:10px;color:${on ? '#fff' : '#8a8a94'}` }; });
+    const tabOn = Object.fromEntries(tabDefs.map(x => [x[0], s.tab === x[0]]));
+
+    const badge = (state) => { const c = th[state]; return `font-size:10px;font-weight:600;letter-spacing:.3px;padding:3px 7px;border-radius:5px;background:${c}22;color:${c};text-transform:uppercase;flex:none`; };
+    const stateLabels = { running: 'Running', permission: 'Needs you', done: 'Done', error: 'Error' };
+    const agents = s.agents.map(a => ({ ...a, dotStyle: dot(th[a.state], a.state !== 'done'), badgeStyle: badge(a.state), stateLabel: stateLabels[a.state], needsApproval: a.state === 'permission', approve: stop(() => { this.setAgent(a.id, { state: 'running', task: `Running: ${a.command}` }); this.transient({ left: a.name, right: 'Approved', color: th.done }, 1600); }), deny: stop(() => this.setAgent(a.id, { state: 'error', task: 'Denied — waiting' })) }));
+    const approval = agents.find(a => a.needsApproval);
+
+    const kinds = { email: ['✉', '#3d8bff'], teams: ['T', '#6264a7'], sms: ['✉', '#34c759'], system: ['⌁', '#8a8a94'] };
+    const notifRows = notifs.map(n => ({ ...n, glyph: kinds[n.kind][0], iconStyle: `width:24px;height:24px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;background:${kinds[n.kind][1]}` }));
+
+    const wIcon = (kind, size) => { const c = kind === 'sun' ? '#f5b73a' : kind === 'moon' ? '#c9d2ff' : kind === 'rain' ? '#7fb2ff' : '#d8d8de'; return `width:${size}px;height:${size}px;border-radius:${kind === 'cloud' || kind === 'rain' ? '40%' : '50%'};flex:none;background:${kind === 'moon' ? `radial-gradient(circle at 35% 35%,${c},#6b74a8)` : kind === 'sun' ? `radial-gradient(circle,${c},#f08a1f)` : kind === 'rain' ? `linear-gradient(180deg,#d8d8de 55%,${c} 55%)` : c};box-shadow:${kind === 'sun' ? `0 0 ${size / 2}px #f5b73a88` : 'none'}`; };
+    const hourly = s.weather.hourly.map(([tt, k, p], i) => { const h = (s.now.getHours() + i + 1) % 24; return { label: `${h % 12 || 12}${h >= 12 ? 'p' : 'a'}`, temp: `${tt}°`, precip: p, iconStyle: wIcon(k, 18) }; });
+
+    const plays = (s.sportsMode === 'score' ? [] : s.sportsMode === 'scoring' ? s.plays.filter(p => p.scoring) : s.plays).slice(0, 5).map(p => ({ ...p, rowStyle: `display:flex;gap:10px;align-items:baseline;font-size:11.5px;color:${p.scoring ? '#fff' : '#9a9aa4'};padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)`, clockStyle: `font-family:'IBM Plex Mono',monospace;font-size:10px;color:${p.scoring ? '#ff6b6b' : '#7a7a84'};flex:none;width:52px` }));
+
+    const chip = (on) => `font:inherit;font-size:11.5px;padding:5px 9px;border-radius:7px;border:1px solid ${on ? '#3a3a46' : '#23232b'};cursor:pointer;background:${on ? '#2a2a33' : '#17171c'};color:${on ? '#fff' : '#9a9aa4'};display:inline-flex;align-items:center;gap:6px`;
+    const toggle = (on) => `width:36px;height:22px;border-radius:11px;background:${on ? th.running : '#2a2a33'};position:relative;cursor:pointer;transition:background .2s;flex:none`;
+    const knob = (on) => `position:absolute;top:2px;left:${on ? 16 : 2}px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s`;
+    const tabBtn = (on) => `font:inherit;font-size:12px;padding:5px 10px;border-radius:6px;border:0;cursor:pointer;background:${on ? '#2a2a33' : 'transparent'};color:${on ? '#fff' : '#9a9aa4'}`;
+    const rows = (defs, key) => defs.map(([k, label, desc]) => ({ label, desc, trackStyle: toggle(s[key][k]), knobStyle: knob(s[key][k]), toggle: () => this.setState(st => ({ [key]: { ...st[key], [k]: !st[key][k] } })) }));
+
+    const artHue = (s.media.title.length * 37) % 360;
+    const lockNotifs = s.lockOpts.hideContentOnLock ? notifRows.slice(0, 2).map(n => ({ ...n, body: `${n.title.split(' ')[0]} sent you a message` })) : notifRows.slice(0, 2);
+    const homeIcons = Array.from({ length: isOpen ? 16 : 12 }, (_, i) => ({ style: `aspect-ratio:1;border-radius:14px;background:hsl(${(i * 47) % 360},45%,${i % 3 ? 55 : 40}%);opacity:.9` }));
+
+    return {
+      isOpen, locked: s.locked, unlocked: !s.locked, clock: this.fmt(s.now), clockBig: this.fmt(s.now), dateLabel: s.now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }), battery: `${s.battery}%${s.charging ? ' ⚡' : ''}`,
+      setClosed: () => this.setState({ fold: 'closed', view: 'compact' }), setOpen: () => this.setState({ fold: 'open', view: 'compact' }),
+      closedTabStyle: tabBtn(!isOpen), openTabStyle: tabBtn(isOpen),
+      toggleLock: () => s.locked ? this.unlock() : this.setState({ locked: true, view: 'compact' }), lockBtnLabel: s.locked ? 'Unlock phone' : 'Lock phone',
+      lockBtnStyle: `font:inherit;font-size:12px;padding:6px 12px;border-radius:7px;border:1px solid #2a2a33;cursor:pointer;background:${s.locked ? '#2a2a33' : '#17171c'};color:#fff`,
+      toggleSettings: () => this.setState({ settingsOpen: !s.settingsOpen }), settingsOpen: s.settingsOpen,
+      settingsBtnStyle: `font:inherit;font-size:12px;padding:6px 12px;border-radius:7px;border:1px solid #2a2a33;cursor:pointer;background:${s.settingsOpen ? '#2a2a33' : '#17171c'};color:#fff`,
+      phoneStyle: `position:relative;width:${screenW + bezel * 2}px;height:${screenH + bezel * 2}px;border-radius:${isOpen ? 22 : 30}px;border:${bezel}px solid #111;box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.06);overflow:hidden;background:${s.locked ? 'linear-gradient(160deg,#1c2541 0%,#3a2a5d 55%,#0f1420 100%)' : 'linear-gradient(160deg,#dfe7f2 0%,#c9d6e8 40%,#e9d9c8 100%)'};transition:width .3s,height .3s`,
+      statusStyle: `position:absolute;top:0;left:0;right:0;height:${cutY + cutD / 2 + 8}px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:11px;font-weight:500;color:${s.locked ? '#fff' : '#111'};pointer-events:none;${isOpen ? 'justify-content:flex-start;gap:24px' : ''}`,
+      statusLeftStyle: bubbleOverClock || (!isOpen && !v.compact && !v.locked && left < 60) ? 'opacity:0;transition:opacity .2s' : 'transition:opacity .2s',
+      statusRightStyle: (!isOpen && !s.locked && (v.compact ? islandW + (hasBubble ? bubbleW + 6 : 0) : islandW) > 200) || (!isOpen && !v.compact && !v.locked) ? 'opacity:0;transition:opacity .2s' : 'transition:opacity .2s',
+      homeGridStyle: `position:absolute;top:${cutY + 40}px;left:0;right:0;padding:0 22px;display:grid;grid-template-columns:repeat(${isOpen ? 8 : 4},1fr);gap:${isOpen ? 22 : 18}px ${isOpen ? 26 : 18}px`,
+      homeIcons,
+      cutoutStyle: `position:absolute;left:${cx - cutD / 2}px;top:${cutY - cutD / 2}px;width:${cutD}px;height:${cutD}px;border-radius:50%;background:#000;box-shadow:inset 0 0 0 2px #0a0a0a,0 0 0 1px rgba(255,255,255,.08);z-index:3;pointer-events:none`,
+      islandWrapStyle: 'position:absolute;inset:0;pointer-events:none;z-index:2',
+      islandStyle: islandStyle + ';pointer-events:auto', glowStyle, cutoutGapStyle, cutoutRowStyle, leftWingStyle, rightWingStyle,
+      v, accent: act.color,
+      lockGlyphStyle: 'display:flex;flex-direction:column;align-items:center;width:14px', shackleStyle: `width:8px;height:7px;border:2px solid #fff;border-bottom:0;border-radius:5px 5px 0 0;transform-origin:left bottom;${s.unlocking ? 'animation:islandUnlock .5s ease forwards' : ''}`,
+      lockText: act.left, lockHasText, lockNoText: !lockHasText, lockDotStyle: `width:6px;height:6px;border-radius:50%;background:${s.unlocking ? th.done : 'rgba(255,255,255,.35)'};box-shadow:0 0 8px ${s.unlocking ? th.done : 'transparent'};transition:background .3s`,
+      leftLabel, rightLabel, leftDotStyle: dot(act.color, act.kind !== 'idle'), showBars: !!act.bars,
+      detailGlyph: act.glyph, detailTitle: act.title, detailSub: act.sub, detailHasMeter: act.meter != null, detailMeterStyle: `height:100%;width:${(act.meter || 0) * 100}%;background:${act.color}`,
+      detailArtStyle: `width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;background:${act.kind === 'media' ? `linear-gradient(135deg,hsl(${artHue},60%,55%),hsl(${artHue + 60},60%,35%))` : act.color + '33'};${act.kind === 'call' ? 'position:relative' : ''}`,
+      detailActions: act.actions.map(([label, bg, fg, fn]) => ({ label, fn: stop(fn), style: `font:inherit;font-size:11.5px;font-weight:600;background:${bg};color:${fg};border:0;border-radius:16px;padding:0 14px;height:32px;cursor:pointer;flex:none` })),
+      swallow, pressStart, pressEnd, pressCancel,
+      showBubble: !!bubble && (v.compact) && !s.locked, bubbleText: bubble || '',
+      bubbleStyle: `position:absolute;left:${bubbleLeft}px;top:${cutY - 17 + cutD / 2}px;height:34px;width:${bubbleW}px;padding:0 6px;border-radius:17px;background:#000;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.05);transition:left .32s cubic-bezier(.2,.8,.2,1);pointer-events:auto`,
+      tabs, tab: tabOn, goAgents: stop(() => this.setState({ tab: 'agents' })), goWeather: stop(() => this.setState({ tab: 'weather' })), goCalendar: stop(() => this.setState({ tab: 'calendar' })), goSports: stop(() => this.setState({ tab: 'sports' })),
+      quietBtnStyle: `font:inherit;font-size:13px;width:28px;height:28px;border-radius:9px;border:0;cursor:pointer;background:${s.quiet ? '#8a5cf6' : 'rgba(255,255,255,.08)'};color:${s.quiet ? '#fff' : '#9a9aa4'};flex:none`, toggleQuiet: stop(() => this.setState({ quiet: !s.quiet })),
+      show: s.show, showApproval: !!approval, approval: approval || {}, agents, agentSummary: perm ? `${perm} needs you` : running ? `${running} running` : 'idle', agentDotStyle: dot(th[agentState], agentState !== 'done'),
+      weather: s.weather, weatherTemp: `${s.weather.temp}°`, weatherFeels: `${s.weather.feels}°`, hourly, weatherIconStyle: wIcon(s.weather.cond.toLowerCase().includes('cloud') ? 'cloud' : 'sun', 40),
+      meeting: s.meeting, joinMeeting: stop(() => { this.setState({ view: 'compact' }); this.transient({ left: 'Teams', right: 'Joining Design sync…', color: th.done, glyph: '▣' }, 2000); }),
+      events: s.events.map(e => ({ ...e, timeStyle: "font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9a9aa4;width:40px;flex:none;text-align:right", join: stop(() => { this.setState({ view: 'compact' }); this.transient({ left: e.meta.split(' ')[0], right: `Joining ${e.title}…`, color: th.done }, 2000); }) })),
+      todayLabel: s.now.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
+      game: s.game, plays, sportsModeLabel: s.sportsMode === 'pbp' ? 'Play-by-play' : s.sportsMode === 'scoring' ? 'Scoring plays' : 'Live score',
+      media: s.media, artStyle: `width:38px;height:38px;border-radius:9px;flex:none;background:linear-gradient(135deg,hsl(${artHue},60%,55%),hsl(${artHue + 60},60%,35%))`, mediaProgressStyle: `height:100%;width:${s.media.progress * 100}%;background:#fff`, mediaPlayGlyph: s.media.playing ? '❙❙' : '▶',
+      mediaBtnStyle: 'font:inherit;font-size:11px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(255,255,255,.1);color:#fff;cursor:pointer',
+      mediaToggle: stop(() => this.setState(st => ({ media: { ...st.media, playing: !st.media.playing } }))), mediaNext: stop(() => this.nextTrack()), mediaPrev: stop(() => this.nextTrack()),
+      notifs: notifRows, notifCount: notifRows.length, noNotifs: notifRows.length === 0, clearNotifs: stop(() => this.setState({ notifs: [] })), lockNotifs,
+      bookmarks: s.bookmarks.map(b => ({ ...b, initial: b.label[0], tileStyle: `width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;background:${b.color}`, open: stop(() => { this.setState({ view: 'compact' }); this.transient({ left: 'Chrome', right: `Opening ${b.url}`, glyph: '⌗' }, 1400); }) })),
+      holdLabel: `${s.holdMs} ms`,
+      sizeOpts: [['minimal', 'Minimal'], ['compact', 'Compact'], ['roomy', 'Roomy']].map(([v2, label]) => ({ label, style: chip(s.size === v2), pick: () => this.setState({ size: v2 }) })),
+      holdOpts: [[250, 'Short · 250 ms'], [400, 'Default · 400 ms'], [600, 'Long · 600 ms']].map(([v2, label]) => ({ label, style: chip(s.holdMs === v2), pick: () => this.setState({ holdMs: v2 }) })),
+      gestureRows: rows([['tapDetail', 'Tap shows detail', 'Single tap opens the live-activity card'], ['haptics', 'Haptics', 'Tick on expand, double-tick on events'], ['splitIsland', 'Split island', 'Second activity floats as a bubble beside the pill']], 'gestures'),
+      lockRows: rows([['showOnLock', 'Show on lock screen', 'Island stays visible while locked'], ['hideContentOnLock', 'Hide content when locked', 'Only the lock glyph and sender names'], ['unlockAnim', 'Unlock animation', 'Shackle opens, pill bounces, glow turns green']], 'lockOpts'),
+      moduleRows: rows([['agents', 'Agent status', 'Pushed from your Mac'], ['calls', 'Calls', 'Phone, Teams, WhatsApp — Accept / Decline'], ['messages', 'Messages', 'SMS/RCS, WhatsApp previews'], ['teams', 'Teams messages', 'Mentions and DMs'], ['email', 'Email', 'Outlook, Gmail'], ['meetings', 'Meetings', 'Calendar with Join'], ['sports', 'Sports scores', 'Live games for followed teams'], ['weather', 'Weather', 'Current location'], ['media', 'Now playing', 'Any media session'], ['timer', 'Timer & Pomodoro', 'Live countdown in the pill'], ['bookmarks', 'Bookmarks', 'Up to 5, open in Chrome'], ['system', 'System', 'Charging, Buds, silent mode, volume, clipboard']], 'show'),
+      sportsModes: [['score', 'Score only'], ['scoring', 'Scoring plays'], ['pbp', 'Play-by-play']].map(([v2, label]) => ({ label, style: chip(s.sportsMode === v2), pick: () => this.setState({ sportsMode: v2 }) })),
+      leagueChips: Object.keys(s.sportsLeagues).map(k => ({ label: k, style: chip(s.sportsLeagues[k]), pick: () => this.setState(st => ({ sportsLeagues: { ...st.sportsLeagues, [k]: !st.sportsLeagues[k] } })) })),
+      teamChips: Object.keys(s.sportsTeams).map(k => ({ label: k, style: chip(s.sportsTeams[k]), pick: () => this.setState(st => ({ sportsTeams: { ...st.sportsTeams, [k]: !st.sportsTeams[k] } })) })),
+      lightThemes: Object.keys(this.themes).map(k => ({ label: k[0].toUpperCase() + k.slice(1), style: chip(s.lightTheme === k), swatch: `width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,${this.themes[k].running},${this.themes[k].done})`, pick: () => this.setState({ lightTheme: k }) })),
+      trigStyle: 'font:inherit;font-size:12px;padding:6px 11px;border-radius:7px;border:1px solid #23232b;background:#14141a;color:#d8d8de;cursor:pointer;display:inline-flex;align-items:center;gap:7px',
+      timerBtnLabel: s.timer.running ? 'Stop timer' : 'Start timer', mediaBtnLabel: s.media.playing ? 'Pause music' : 'Play music', silentBtnLabel: s.silent ? 'Silent off' : 'Silent on',
+
+      evAgentRun: () => this.setAgent(1, { state: 'running', task: 'Refactoring auth middleware' }),
+      evAgentPerm: () => { this.setAgent(1, { state: 'permission', task: 'Wants to run: npm run build' }); if (!s.locked) this.setState({ view: 'detail' }); },
+      evAgentDone: () => { this.setAgent(1, { state: 'done', task: 'Refactor complete · 12 files' }); this.transient({ left: 'Claude', right: 'Task complete', color: th.done, glyph: '✳' }, 2000); },
+      evTimer: () => { this.setState({ timer: { running: !s.timer.running, seconds: 0 } }); this.bounce(); },
+      evMediaToggle: () => { this.setState(st => ({ media: { ...st.media, playing: !st.media.playing } })); this.bounce(); },
+      evCall: () => { if (!s.show.calls) return; this.setState({ call: { name: 'Priya Natarajan', app: 'Teams' }, view: s.locked ? 'compact' : 'detail' }); this.bounce(); },
+      evScore: () => { if (!s.show.sports) return; const g = { ...s.game, homeScore: s.game.homeScore + 3, period: 'Q4 2:48' }; const p = { id: Date.now(), clock: 'Q4 2:48', text: 'Austin Reaves makes 24-ft three (James assists)', scoring: true }; this.setState(st => ({ game: g, plays: [p, ...st.plays].slice(0, 8) })); if (s.sportsMode !== 'score') this.transient({ left: `${g.home} ${g.homeScore}–${g.awayScore} ${g.away}`, right: p.text, color: '#ff6b6b', glyph: '●' }, 2600); else this.bounce(); },
+      evPlay: () => { if (!s.show.sports) return; const opts = ['Tatum misses 3-pt jumper', 'Davis blocks Brown layup', 'Lakers full timeout', 'White steals from Reaves']; const p = { id: Date.now(), clock: 'Q4 2:31', text: opts[Math.floor(Math.random() * opts.length)], scoring: false }; this.setState(st => ({ plays: [p, ...st.plays].slice(0, 8) })); if (s.sportsMode === 'pbp') this.transient({ left: `${s.game.homeScore}–${s.game.awayScore}`, right: p.text, color: '#ff6b6b', glyph: '●' }, 1800); },
+      evTeams: () => { if (!s.show.teams) return; this.pushNotif({ kind: 'teams', title: 'Priya (Teams)', body: '@you can you review the PR?' }); if (!s.quiet) this.transient({ left: 'Priya', right: 'can you review the PR?', color: '#6264a7', glyph: 'T' }); },
+      evSMS: () => { if (!s.show.messages) return; this.pushNotif({ kind: 'sms', title: 'Jordan', body: 'running 10 late, order me a coffee?' }); if (!s.quiet) this.transient({ left: 'Jordan', right: 'running 10 late…', color: '#34c759', glyph: '✉' }); },
+      evEmail: () => { if (!s.show.email) return; this.pushNotif({ kind: 'email', title: 'Alex Rivera (Outlook)', body: 'Contract draft attached' }); if (!s.quiet) this.transient({ left: 'Outlook', right: 'Alex Rivera · Contract draft', color: '#3d8bff', glyph: '✉' }); },
+      evMeeting: () => s.show.meetings && this.transient({ left: 'Design sync', right: 'in 5 min · Teams', color: th.accent, glyph: '▣' }, 2600),
+      evBuds: () => s.show.system && this.transient({ left: 'Galaxy Buds', right: 'Connected · 82%', meter: 0.82, color: th.accent, glyph: '◠' }),
+      evCharge: () => { if (!s.show.system) return; this.setState({ charging: !s.charging }); this.transient({ left: 'Charging', right: `${s.battery}%`, meter: s.battery / 100, color: th.done, glyph: '⚡' }); },
+      evSilent: () => { if (!s.show.system) return; const q = !s.silent; this.setState({ silent: q }); this.transient({ left: q ? 'Silent' : 'Sound on', right: q ? 'Ringer off' : 'Ringer on', color: q ? th.error : th.done, glyph: q ? '◌' : '◉' }, 1400); },
+      evVolume: () => { if (!s.show.system) return; const v2 = s.volume >= 1 ? 0.3 : Math.min(1, s.volume + 0.1); this.setState({ volume: v2 }); this.transient({ left: 'Volume', right: `${Math.round(v2 * 100)}%`, meter: v2, color: th.accent, glyph: '◂)' }, 1400); },
+      evCopy: () => s.show.system && this.transient({ left: 'Copied', right: 'Chrome · 42 chars', color: th.accent, glyph: '⧉' }, 1400),
+      evNav: () => this.transient({ left: '↰ 400 ft', right: 'Turn left on Congress Ave', color: th.done, glyph: '↰' }, 3000),
+    };
+  }
+  nextTrack() {
+    const tracks = [['Nightcall', 'Kavinsky'], ['Midnight City', 'M83'], ['Genesis', 'Grimes'], ['Digital Love', 'Daft Punk']];
+    const i = tracks.findIndex(t => t[0] === this.state.media.title), n = tracks[(i + 1) % tracks.length];
+    this.setState({ media: { title: n[0], artist: n[1], playing: true, progress: 0 } });
+  }
+}
+</script>
+</body>
+</html>
