@@ -199,7 +199,7 @@ class IslandOverlayService : LifecycleService() {
     /** Fold, unfold or rotate: re-read the cutout and re-place the window. */
     private fun refreshGeometry() {
         if (!::windowManager.isInitialized) return
-        IslandState.setCutout(CutoutReader.read(this))
+        IslandState.setCutout(CutoutReader.read(this, rootView?.display))
         updateWindowPosition()
     }
 
@@ -645,7 +645,7 @@ class IslandOverlayService : LifecycleService() {
                 // Cheap safety net for any fold or rotation the callbacks miss. The
                 // read no longer depends on where the window is, so this cannot
                 // feed back into itself, and setCutout ignores an equal value.
-                val geometry = CutoutReader.read(this@IslandOverlayService)
+                val geometry = CutoutReader.read(this@IslandOverlayService, rootView?.display)
                 if (geometry != IslandState.cutout.value) {
                     IslandState.setCutout(geometry)
                     updateWindowPosition()

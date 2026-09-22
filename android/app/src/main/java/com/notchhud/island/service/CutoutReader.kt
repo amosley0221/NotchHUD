@@ -30,8 +30,8 @@ import com.notchhud.island.core.CutoutGeometry
  */
 object CutoutReader {
 
-    fun read(context: Context): CutoutGeometry {
-        val windowContext = windowContext(context)
+    fun read(context: Context, display: Display? = null): CutoutGeometry {
+        val windowContext = windowContext(context, display)
         val windowManager = windowContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         val (screenW, screenH) = runCatching { screenSize(windowManager) }
@@ -91,11 +91,18 @@ object CutoutReader {
      * infers its display by calling `getDisplay()` on the receiver, which a Service
      * does not have, so the display is named explicitly first.
      */
-    private fun windowContext(context: Context): Context {
+    private fun windowContext(context: Context, preferred: Display?): Context {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return context
         return runCatching {
-            val displays = context.getSystemService(DisplayManager::class.java)
-            val display = displays.getDisplay(Display.DEFAULT_DISPLAY)
+            // Prefer the display the overlay is genuinely on. On a Fold,
+            // DEFAULT_DISPLAY can stay pinned to one panel across a fold, so asking
+            // it returns the other screen's metrics and the island keeps the other
+            // screen's geometry — and its nudge. A view's display is the live one by
+            // definition, and unlike its insets it does not depend on where the
+            // window sits, so this cannot feed back into placement.
+            val display = preferred
+                ?: context.getSystemService(DisplayManager::class.java)
+                    .getDisplay(Display.DEFAULT_DISPLAY)
             context.createDisplayContext(display)
                 .createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
         }.getOrDefault(context)

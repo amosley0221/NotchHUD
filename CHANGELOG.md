@@ -3,6 +3,23 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.14
+
+- **Folding is detected properly.** Geometry was read through
+  `Display.DEFAULT_DISPLAY`, which on a Fold can stay pinned to one panel across a
+  fold — so the reconcile loop ran every 600 ms and kept getting the *same* answer,
+  leaving the cover screen using the unfolded screen's geometry and its nudge. It
+  now asks the display the overlay is actually on, which is the live one by
+  definition and, unlike the view's insets, does not depend on where the window sits.
+- **The island's vertical placement is adjustable.** The pill has to be at least as
+  tall as the camera, and on the inner screen the lens sits ~90 px down from the top
+  edge, so the shape necessarily reaches that far — which reads as it hanging below
+  the cutout. Settings → Island position gains a vertical nudge and a control for how
+  much height sits around the camera, both stored per screen alongside the horizontal
+  nudge. Default padding drops from 10 dp to 6 dp, and the diagnostic now reports the
+  cutout's height as well as its width.
+- **macOS can launch at login**, via `SMAppService` — no helper bundle needed.
+
 ## 1.0.13
 
 - **Sports loads teams again.** Every league returned HTTP 403 because of the
