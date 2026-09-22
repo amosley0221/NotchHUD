@@ -65,7 +65,10 @@ class SystemEventReceiver : BroadcastReceiver() {
                 NotificationRouter.systemTransient("$name disconnected", null, Tokens.TextQuaternary, durationMs = 1400L)
             }
             Intent.ACTION_USER_PRESENT -> {
-                IslandState.setUnlocking(true)
+                // Fast path only — IslandOverlayService.startLockMonitor reconciles
+                // the keyguard state regardless, because this broadcast does not
+                // arrive on every unlock flow.
+                if (ServiceRuntime.current.unlockAnimation) IslandState.setUnlocking(true)
                 IslandState.setLocked(false)
             }
             Intent.ACTION_SCREEN_OFF -> {

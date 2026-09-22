@@ -3,6 +3,23 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.5
+
+The island runs. This is the first release fixing behaviour rather than a crash.
+
+- **The padlock now clears when you unlock.** Lock state was driven entirely by
+  the `ACTION_USER_PRESENT` broadcast, which does not arrive on every unlock flow —
+  when it went missing the island sat showing a padlock over an unlocked phone with
+  nothing able to clear it. A monitor now reconciles against
+  `KeyguardManager.isKeyguardLocked` directly, so the state cannot get stuck
+  whatever the OEM broadcasts. The broadcast is kept as a fast path.
+- **The unlock animation plays properly**, because it now actually gets triggered:
+  the shackle rotates and lifts, the dot and glow rail turn green, the pill bounces,
+  and the lock wing disappears.
+- **"Show on lock screen" does something.** The toggle existed but was wired to
+  nothing. Turning it off hides the island while locked; an incoming call still
+  comes through.
+
 ## 1.0.4
 
 Third and, on the evidence, final crash in the startup path. The window context

@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -115,6 +116,14 @@ fun IslandRoot(
         animationSpec = tween(Tokens.FadeMs),
         label = "rail",
     )
+
+    // "Show on lock screen" off means exactly that. The window wraps its content,
+    // so collapsing to nothing leaves no pill and no touch target; an incoming call
+    // still comes through, which is the one thing worth waking the island for.
+    if (locked && !settings.showOnLock && call == null) {
+        Box(Modifier.size(0.dp))
+        return
+    }
 
     val shape = RoundedCornerShape(
         if (view == IslandView.COMPACT) Tokens.PillRadius else Tokens.PanelRadius

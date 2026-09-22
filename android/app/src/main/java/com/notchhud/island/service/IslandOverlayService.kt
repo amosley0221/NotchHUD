@@ -13,6 +13,7 @@ import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.view.Display
 import android.view.Gravity
 import android.view.MotionEvent
@@ -141,6 +142,7 @@ class IslandOverlayService : LifecycleService() {
             mediaMonitor.start()
             observeSettings()
             startTransientReaper()
+            startLockMonitor()
         } catch (t: Throwable) {
             CrashReporter.record(this, "island startup", t)
             stopSelf()
@@ -532,6 +534,46 @@ class IslandOverlayService : LifecycleService() {
             while (currentCoroutineContext().isActive) {
                 IslandState.clearTransientIfExpired()
                 delay(200L)
+            }
+        }
+    }
+
+    /**
+     * Keeps the island's idea of the keyguard honest.
+     *
+     * ACTION_USER_PRESENT is a fast path, not a guarantee — it does not reliably
+     * arrive on every unlock flow, and when it went missing the island sat showing
+     * a padlock over an unlocked phone with nothing able to clear it. The keyguard
+     * state is cheap to query, so ask instead of waiting to be told: a binder call
+     * a second costs nothing next to the animations already running, and the state
+     * can no longer get stuck whatever the OEM does or does not broadcast.
+     *
+     * The broadcast receiver still handles the same transitions, so an unlock it
+     * does catch is reflected immediately; both paths are idempotent, and this loop
+     * acts only when the two disagree.
+     */
+    private fun startLockMonitor() {
+        lifecycleScope.launch {
+            val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+
+            while (currentCoroutineContext().isActive) {
+                // A dark screen is locked for our purposes, and skipping the query
+                // keeps this loop off the CPU while the phone is in a pocket.
+                val locked = if (power.isInteractive) keyguard.isKeyguardLocked else true
+
+                if (locked != IslandState.locked.value) {
+                    if (locked) {
+                        IslandState.setUnlocking(false)
+                        IslandState.setLocked(true)
+                    } else {
+                        // Set unlocking first: the lock wing has to still be on
+                        // screen for the shackle animation to play out of.
+                        if (ServiceRuntime.current.unlockAnimation) IslandState.setUnlocking(true)
+                        IslandState.setLocked(false)
+                    }
+                }
+                delay(600L)
             }
         }
     }
