@@ -49,19 +49,33 @@ class EspnRepository {
      * for a league that genuinely has no teams. Collapsing both into "empty" is why
      * the picker used to show nothing at all with no hint as to why.
      */
-    suspend fun teams(leagueCode: String): List<Pair<String, String>>? = withContext(Dispatchers.IO) {
-        val path = KNOWN_LEAGUES[leagueCode] ?: return@withContext null
-        val body = Http.getString(
-            "https://site.api.espn.com/apis/site/v2/sports/${path.sport}/${path.league}/teams"
-        ) ?: return@withContext null
+    suspend fun teams(leagueCode: String): TeamsResult = withContext(Dispatchers.IO) {
+        val path = KNOWN_LEAGUES[leagueCode]
+            ?: return@withContext TeamsResult.Failed("unknown league")
 
-        runCatching {
+        val body = when (
+            val result = Http.get(
+                "https://site.api.espn.com/apis/site/v2/sports/${path.sport}/${path.league}/teams"
+            )
+        ) {
+            is Http.Result.Ok -> result.body
+            is Http.Result.Failed -> return@withContext TeamsResult.Failed(result.reason)
+        }
+
+        val parsed = runCatching {
             json.parseToJsonElement(body).jsonObject["sports"]!!.jsonArray[0].jsonObject["leagues"]!!
                 .jsonArray[0].jsonObject["teams"]!!.jsonArray.map { entry ->
                     val team = entry.jsonObject["team"]!!.jsonObject
                     team["id"]!!.jsonPrimitive.content to team["displayName"]!!.jsonPrimitive.content
                 }
         }.getOrNull()
+
+        parsed?.let { TeamsResult.Ok(it) } ?: TeamsResult.Failed("could not parse the response")
+    }
+
+    sealed interface TeamsResult {
+        data class Ok(val teams: List<Pair<String, String>>) : TeamsResult
+        data class Failed(val reason: String) : TeamsResult
     }
 
     /**

@@ -17,6 +17,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.notchhud.island.core.Bookmark
 import com.notchhud.island.core.IslandSize
+import com.notchhud.island.core.IslandState
 import com.notchhud.island.core.LightTheme
 import com.notchhud.island.core.Modules
 import com.notchhud.island.core.SettingsRepository
@@ -107,6 +109,9 @@ private fun SettingsScreen(repo: SettingsRepository) {
         ToggleRow("Show on lock screen", settings.showOnLock) { scope.launch { repo.setShowOnLock(it) } }
         ToggleRow("Hide content when locked", settings.hideContentOnLock) { scope.launch { repo.setHideContentOnLock(it) } }
         ToggleRow("Unlock animation", settings.unlockAnimation) { scope.launch { repo.setUnlockAnimation(it) } }
+
+        Header("Island position")
+        IslandPositionSection(settings, repo)
 
         Header("Modules")
         Modules.all.forEach { module ->
@@ -202,6 +207,66 @@ private fun SettingsScreen(repo: SettingsRepository) {
  * a tap on "Load teams" looked like nothing at all — the college leagues alone
  * are ~1 MB each and can take a while.
  */
+/**
+ * Where the island sits, and what the app thinks it knows.
+ *
+ * Cutout detection has been wrong on this device more than once, so this shows the
+ * raw numbers it is working from and lets the position be corrected by hand. The
+ * two screens are stored separately because the camera is in a different place on
+ * each.
+ */
+@Composable
+private fun IslandPositionSection(settings: SettingsSnapshot, repo: SettingsRepository) {
+    val cutout by IslandState.cutout.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    val screenLabel = if (cutout.folded) "Cover screen" else "Unfolded screen"
+    val offset = if (cutout.folded) settings.offsetFolded else settings.offsetUnfolded
+
+    Text(
+        buildString {
+            append("$screenLabel · ${cutout.screenWidth} × ${cutout.screenHeight} px\n")
+            if (cutout.hasCutout) {
+                val percent = if (cutout.screenWidth > 0) {
+                    cutout.centerX * 100 / cutout.screenWidth
+                } else 0
+                append("Camera reported at x=${cutout.centerX} ($percent% across), ")
+                append("y=${cutout.centerY}, ${cutout.width} px wide")
+            } else {
+                append("No camera cutout reported on this screen — the island is centred.")
+            }
+        },
+        fontSize = 12.sp,
+    )
+
+    Text(
+        "Nudge (${(offset * 100).toInt()}% of screen width)",
+        fontSize = 12.sp,
+        fontWeight = FontWeight.W500,
+    )
+    Slider(
+        value = offset,
+        onValueChange = { value ->
+            scope.launch {
+                if (cutout.folded) repo.setOffsetFolded(value) else repo.setOffsetUnfolded(value)
+            }
+        },
+        valueRange = -0.45f..0.45f,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = {
+            scope.launch {
+                if (cutout.folded) repo.setOffsetFolded(0f) else repo.setOffsetUnfolded(0f)
+            }
+        }) { Text("Centre") }
+    }
+    Text(
+        "Applies to the $screenLabel only. Fold or unfold and this section follows.",
+        fontSize = 11.sp,
+    )
+}
+
 @Composable
 private fun TeamPicker(settings: SettingsSnapshot, espn: EspnRepository, onChange: (Set<String>) -> Unit) {
     var teams by remember(settings.leagues) { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -224,8 +289,12 @@ private fun TeamPicker(settings: SettingsSnapshot, espn: EspnRepository, onChang
                 val results = coroutineScope {
                     settings.leagues.map { code -> async { code to espn.teams(code) } }.awaitAll()
                 }
-                teams = results.mapNotNull { it.second }.flatten().distinctBy { it.first }.sortedBy { it.second }
-                failed = results.filter { it.second == null }.map { it.first }
+                teams = results
+                    .mapNotNull { (_, result) -> (result as? EspnRepository.TeamsResult.Ok)?.teams }
+                    .flatten().distinctBy { it.first }.sortedBy { it.second }
+                failed = results.mapNotNull { (code, result) ->
+                    (result as? EspnRepository.TeamsResult.Failed)?.let { "$code (${it.reason})" }
+                }
                 loaded = true
                 loading = false
             }
@@ -237,7 +306,8 @@ private fun TeamPicker(settings: SettingsSnapshot, espn: EspnRepository, onChang
     }
 
     if (failed.isNotEmpty()) {
-        Text("Could not reach: ${failed.sorted().joinToString(", ")}", fontSize = 11.sp)
+        Text("Could not reach:", fontSize = 11.sp, fontWeight = FontWeight.W500)
+        failed.sorted().forEach { Text("  $it", fontSize = 11.sp) }
     }
 
     if (loaded && teams.isEmpty() && failed.isEmpty()) {

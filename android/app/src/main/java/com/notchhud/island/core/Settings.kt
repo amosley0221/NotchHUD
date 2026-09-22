@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -36,6 +37,10 @@ data class SettingsSnapshot(
     val weatherLon: Double? = null,
     val weatherCity: String = "",
     val useDeviceLocation: Boolean = false,
+    /// Nudge along the screen, as a fraction of its width, kept separately for the
+    /// two screens because the camera is in a different place on each.
+    val offsetFolded: Float = 0f,
+    val offsetUnfolded: Float = 0f,
     val useCelsius: Boolean = false,
     val quietFollowsDnd: Boolean = true,
     val quietOnCall: Boolean = true,
@@ -101,6 +106,8 @@ class SettingsRepository(private val context: Context) {
         val weatherLon = stringPreferencesKey("weather_lon")
         val weatherCity = stringPreferencesKey("weather_city")
         val useDeviceLocation = booleanPreferencesKey("use_device_location")
+        val offsetFolded = floatPreferencesKey("offset_folded")
+        val offsetUnfolded = floatPreferencesKey("offset_unfolded")
         val useCelsius = booleanPreferencesKey("use_celsius")
         val quietFollowsDnd = booleanPreferencesKey("quiet_dnd")
         val quietOnCall = booleanPreferencesKey("quiet_call")
@@ -130,6 +137,8 @@ class SettingsRepository(private val context: Context) {
             weatherLon = p[Keys.weatherLon]?.toDoubleOrNull(),
             weatherCity = p[Keys.weatherCity] ?: "",
             useDeviceLocation = p[Keys.useDeviceLocation] ?: false,
+            offsetFolded = p[Keys.offsetFolded] ?: 0f,
+            offsetUnfolded = p[Keys.offsetUnfolded] ?: 0f,
             useCelsius = p[Keys.useCelsius] ?: false,
             quietFollowsDnd = p[Keys.quietFollowsDnd] ?: true,
             quietOnCall = p[Keys.quietOnCall] ?: true,
@@ -153,6 +162,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCompanionUrl(v: String) = edit { it[Keys.companionUrl] = v }
     suspend fun setUseCelsius(v: Boolean) = edit { it[Keys.useCelsius] = v }
     suspend fun setUseDeviceLocation(v: Boolean) = edit { it[Keys.useDeviceLocation] = v }
+    suspend fun setOffsetFolded(v: Float) = edit { it[Keys.offsetFolded] = v }
+    suspend fun setOffsetUnfolded(v: Float) = edit { it[Keys.offsetUnfolded] = v }
     suspend fun setQuietFollowsDnd(v: Boolean) = edit { it[Keys.quietFollowsDnd] = v }
     suspend fun setQuietOnCall(v: Boolean) = edit { it[Keys.quietOnCall] = v }
     suspend fun setQuietManual(v: Boolean) = edit { it[Keys.quietManual] = v }

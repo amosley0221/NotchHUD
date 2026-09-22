@@ -4,12 +4,17 @@ import android.content.Context
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.view.Display
-import android.view.View
 import android.view.WindowManager
 import com.notchhud.island.core.CutoutGeometry
 
 /**
  * Reads the real camera cutout.
+ *
+ * Read only from display-level window metrics, never from the overlay view's own
+ * insets. A small window only reports a cutout when it happens to overlap one, so
+ * asking the view where the camera is makes the answer depend on where we already
+ * put the window — which oscillated between two positions when the window moved
+ * out from under the cutout and the answer changed back.
  *
  * Two things make this harder than it looks on a Fold.
  *
@@ -24,13 +29,6 @@ import com.notchhud.island.core.CutoutGeometry
  * really is top-centre. Nothing here is cached.
  */
 object CutoutReader {
-
-    /** Preferred path: ask the attached overlay view, which is on the live display. */
-    fun read(context: Context, view: View?): CutoutGeometry {
-        val fromView = view?.let { readFromView(it) }
-        if (fromView != null && fromView.hasCutout) return fromView
-        return read(context)
-    }
 
     fun read(context: Context): CutoutGeometry {
         val windowContext = windowContext(context)
@@ -56,16 +54,6 @@ object CutoutReader {
             screenW = screenW,
             screenH = screenH,
         )
-    }
-
-    private fun readFromView(view: View): CutoutGeometry? {
-        val insets = view.rootWindowInsets ?: return null
-        val cutout = insets.displayCutout ?: return null
-        val rect = cutout.boundingRects.maxByOrNull { it.width().toLong() * it.height().toLong() }
-            ?: return null
-
-        val metrics = view.context.resources.displayMetrics
-        return geometry(rect, metrics.widthPixels, metrics.heightPixels)
     }
 
     private fun geometry(rect: android.graphics.Rect?, screenW: Int, screenH: Int): CutoutGeometry {

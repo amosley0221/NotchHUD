@@ -182,7 +182,7 @@ class IslandOverlayService : LifecycleService() {
     /** Fold, unfold or rotate: re-read the cutout and re-place the window. */
     private fun refreshGeometry() {
         if (!::windowManager.isInitialized) return
-        IslandState.setCutout(CutoutReader.read(this, rootView))
+        IslandState.setCutout(CutoutReader.read(this))
         updateWindowPosition()
     }
 
@@ -267,14 +267,6 @@ class IslandOverlayService : LifecycleService() {
         }
         container.addView(compose)
 
-        // Insets change on fold, unfold and rotation, and arrive on the view that is
-        // actually on the live display — a more trustworthy signal than a
-        // configuration callback on a context created at startup.
-        container.setOnApplyWindowInsetsListener { _, insets ->
-            refreshGeometry()
-            insets
-        }
-
         // The owners must be on the view handed to WindowManager, not only on the
         // ComposeView. Compose resolves its recomposer from the *root* view of the
         // window, so it looks for the lifecycle owner starting at the container;
@@ -321,7 +313,13 @@ class IslandOverlayService : LifecycleService() {
             val params = view.layoutParams as? WindowManager.LayoutParams ?: return@post
             val width = view.width.takeIf { it > 0 } ?: return@post
 
-            var x = geo.centerX - width / 2
+            // Manual nudge: detection cannot be trusted on every OEM screen, so the
+            // user gets the last word on where the island sits.
+            val settings = ServiceRuntime.current
+            val offset = if (geo.folded) settings.offsetFolded else settings.offsetUnfolded
+            val anchorX = geo.centerX + (offset * geo.screenWidth).toInt()
+
+            var x = anchorX - width / 2
             x = x.coerceIn(marginPx, (geo.screenWidth - width - marginPx).coerceAtLeast(marginPx))
 
             // Pill top = cutout centre − half the pill height, so the camera sits
