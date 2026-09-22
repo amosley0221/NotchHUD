@@ -3,6 +3,22 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.4
+
+Third and, on the evidence, final crash in the startup path. The window context
+fix in 1.0.3 worked — the app now got as far as attaching the island to the
+window before failing.
+
+- **The view-tree owners are now set on the view handed to WindowManager.** They
+  were on the `ComposeView`, one level down. Compose resolves its recomposer from
+  the *root* view of the window, so it looked for a `ViewTreeLifecycleOwner`
+  starting at the container, found nothing, and threw `IllegalStateException` the
+  moment the view attached. Both views carry the owners now.
+- **Crash reports name real frames.** Traces were fully obfuscated
+  (`n0.a.f(SourceFile:373)`), which is useless in a report the app shows to you.
+  Line numbers are kept for everything and our own class names are no longer
+  renamed.
+
 ## 1.0.3
 
 Actually fixes the crash on starting the island. Confirmed against a real trace

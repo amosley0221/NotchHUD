@@ -232,9 +232,6 @@ class IslandOverlayService : LifecycleService() {
                 )
             }
         }
-        viewHost.attachTo(compose)
-        viewHost.onStart()
-
         val container = object : android.widget.FrameLayout(overlayContext) {
             override fun onTouchEvent(event: MotionEvent): Boolean {
                 // Tapping anywhere off the island collapses it back to compact.
@@ -248,6 +245,16 @@ class IslandOverlayService : LifecycleService() {
             }
         }
         container.addView(compose)
+
+        // The owners must be on the view handed to WindowManager, not only on the
+        // ComposeView. Compose resolves its recomposer from the *root* view of the
+        // window, so it looks for the lifecycle owner starting at the container;
+        // setting it one level down is invisible to that lookup and the view throws
+        // "ViewTreeLifecycleOwner not found" the moment it attaches. Both are set so
+        // the ComposeView is also self-sufficient if it is ever reparented.
+        viewHost.attachTo(container)
+        viewHost.attachTo(compose)
+        viewHost.onStart()
 
         runCatching { windowManager.addView(container, layoutParams()) }
             .onFailure { error ->
