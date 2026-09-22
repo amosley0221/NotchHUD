@@ -3,6 +3,30 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.8
+
+- **"Load teams" works, and says what it is doing.** It fetched each league one
+  after another, swallowed every failure into an empty list, and showed no state at
+  all — so a tap looked identical whether it was still working or had failed. The
+  college league payloads alone are around a megabyte each. Leagues now load in
+  parallel, the button reports progress, unreachable leagues are named, and the
+  read timeout went to 30 s.
+- **Weather can follow the phone.** Settings → Weather has "Use my current
+  location", using `LocationManager` rather than Play Services. This also fixed a
+  latent bug: the old city lookup asked Open-Meteo's *forward* search endpoint for
+  coordinates, which just returns an error, so a resolved location would have shown
+  raw numbers. The platform geocoder does the reverse lookup now.
+- **The macOS app updates itself.** It checks its own GitHub Releases on launch and
+  every six hours. An update appears as a small accent dot beside the menu bar icon
+  plus a menu item that installs it, and the same thing in Settings → General. The
+  installer verifies the downloaded bundle really is Notch HUD before replacing the
+  running one, and clears the download quarantine so Gatekeeper does not block it.
+- **Per-display sizing on macOS.** Shape and length are stored per screen, keyed by
+  display UUID so they survive unplugging. Settings → Displays lists every
+  connected screen with its own shape and a length slider, showing how much of that
+  screen the HUD will take. Height is untouched — it is the length that crowds a
+  small display like a Sidecar iPad.
+
 ## 1.0.7
 
 Found while verifying that the macOS app from 1.0.6 actually launches: it did, and
