@@ -174,15 +174,28 @@ private struct DisplaysPane: View {
                             .frame(width: 52, alignment: .trailing)
                     }
 
-                    Text(sizeSummary(for: screen, config: config))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text(sizeSummary(for: screen, config: config))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Auto") {
+                            settings.setConfig(
+                                DisplayConfig(
+                                    mode: config.mode,
+                                    widthScale: DisplayConfig.suggestedScale(for: screen)
+                                ),
+                                for: screen
+                            )
+                        }
+                        .help("Size the HUD to a fifth of this screen, which keeps it inside the empty middle of the menu bar.")
+                    }
                 }
             }
 
             Section {
                 Button("Refresh display list") { screens = NSScreen.screens }
-                Text("Settings are remembered per display, so unplugging and reconnecting keeps them.")
+                Text("Sized automatically until you move a slider: a fifth of each screen's width, capped at the designed 560 pt. Settings are remembered per display, so unplugging and reconnecting keeps them.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

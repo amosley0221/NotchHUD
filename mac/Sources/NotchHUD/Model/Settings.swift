@@ -95,8 +95,11 @@ final class Settings: ObservableObject {
 
     /// The screen's own settings, falling back to the global defaults.
     func config(for screen: NSScreen) -> DisplayConfig {
-        displayConfigs[screen.persistentID]
-            ?? DisplayConfig(mode: externalMode, widthScale: 1.0)
+        if let stored = displayConfigs[screen.persistentID] { return stored }
+        return DisplayConfig(
+            mode: externalMode,
+            widthScale: DisplayConfig.suggestedScale(for: screen)
+        )
     }
 
     func setConfig(_ config: DisplayConfig, for screen: NSScreen) {

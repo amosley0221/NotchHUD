@@ -3,6 +3,17 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.10
+
+- **The HUD sizes itself to the screen it is on.** In notch-shape mode it overlaps
+  the menu bar by design, which is fine at 560 pt on a 3440 pt ultrawide — 16 % of
+  the width, landing in the empty middle between the app menus and the status items
+  — and unusable at the same 560 pt on a 1314 pt Sidecar iPad, where 42 % of the
+  bar means eating menus at both ends. A display with no per-screen size set now
+  gets a fifth of its width, never more than the designed 560 pt. On the two
+  displays this was tested against that means the ultrawide is untouched and the
+  iPad drops to 263 pt. Settings → Displays has an **Auto** button per screen.
+
 ## 1.0.9
 
 - **Settings is reachable without hunting for the menu bar icon.** `notchhud://settings`
