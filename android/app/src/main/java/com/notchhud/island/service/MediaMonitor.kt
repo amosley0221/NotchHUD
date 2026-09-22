@@ -85,7 +85,7 @@ class MediaMonitor(private val context: Context) {
             NotificationRouter.systemTransient(
                 left = info.title,
                 right = info.artist.ifBlank { info.app },
-                color = ServiceRuntime.settings?.theme?.accent ?: androidx.compose.ui.graphics.Color.White,
+                color = ServiceRuntime.current.theme.accent,
                 durationMs = 1800L,
             )
         }

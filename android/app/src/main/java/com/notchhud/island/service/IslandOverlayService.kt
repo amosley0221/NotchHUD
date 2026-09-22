@@ -34,6 +34,7 @@ import com.notchhud.island.ui.setup.MainActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -238,7 +239,7 @@ class IslandOverlayService : LifecycleService() {
 
             // Pill top = cutout centre − half the pill height, so the camera sits
             // vertically centred inside the black shape.
-            val pillHeightPx = (ServiceRuntime.settings?.islandSize?.pillHeightDp ?: 34f) * density
+            val pillHeightPx = ServiceRuntime.current.islandSize.pillHeightDp * density
             val y = (geo.centerY - pillHeightPx / 2).toInt().coerceAtLeast(0)
 
             if (params.x != x || params.y != y) {
@@ -252,7 +253,7 @@ class IslandOverlayService : LifecycleService() {
     // ------------------------------------------------------------ interaction
 
     private fun onIslandTap() {
-        val settings = ServiceRuntime.settings ?: return
+        val settings = ServiceRuntime.current
         haptics.tick()
         if (!settings.tapShowsDetail) return
         IslandState.setView(
@@ -327,7 +328,7 @@ class IslandOverlayService : LifecycleService() {
 
     private fun toggleQuiet() {
         lifecycleScope.launch {
-            val current = ServiceRuntime.settings?.quietManual ?: false
+            val current = ServiceRuntime.current.quietManual
             settingsRepo.setQuietManual(!current)
             if (current) IslandState.setHeldCount(0)
         }
@@ -349,9 +350,9 @@ class IslandOverlayService : LifecycleService() {
     private fun observeSettings() {
         lifecycleScope.launch {
             settingsRepo.flow.collectLatest { settings ->
-                ServiceRuntime.settings = settings
-                ServiceRuntime.quietActive = resolveQuiet(settings)
-                IslandState.setQuiet(ServiceRuntime.quietActive)
+                ServiceRuntime.update(settings)
+                ServiceRuntime.setQuiet(resolveQuiet(settings))
+                IslandState.setQuiet(ServiceRuntime.isQuiet)
 
                 restartCollectors(settings)
                 reconnectCompanion(settings)
@@ -418,7 +419,7 @@ class IslandOverlayService : LifecycleService() {
     /** 10 s while a followed game is live, 5 min otherwise — straight from the spec. */
     private suspend fun pollSports(settings: SettingsSnapshot) {
         var seenPlayIds = emptySet<String>()
-        while (lifecycleScope.isActive) {
+        while (currentCoroutineContext().isActive) {
             val game = espn.currentGame(settings.leagues, settings.teams)
             IslandState.setGame(game)
 
@@ -452,7 +453,7 @@ class IslandOverlayService : LifecycleService() {
     private suspend fun pollWeather(settings: SettingsSnapshot) {
         val lat = settings.weatherLat ?: return
         val lon = settings.weatherLon ?: return
-        while (lifecycleScope.isActive) {
+        while (currentCoroutineContext().isActive) {
             val city = settings.weatherCity.ifBlank { weatherRepo.cityFor(lat, lon) }
             IslandState.setWeather(weatherRepo.fetch(lat, lon, city))
             delay(15 * 60 * 1000L)
@@ -461,7 +462,7 @@ class IslandOverlayService : LifecycleService() {
 
     private suspend fun pollCalendar() {
         val repo = CalendarRepository(applicationContext)
-        while (lifecycleScope.isActive) {
+        while (currentCoroutineContext().isActive) {
             IslandState.setEvents(repo.today())
             delay(5 * 60 * 1000L)
         }
@@ -470,7 +471,7 @@ class IslandOverlayService : LifecycleService() {
     /** Transients expire on their own clock; one ticker is cheaper than a timer each. */
     private fun startTransientReaper() {
         lifecycleScope.launch {
-            while (lifecycleScope.isActive) {
+            while (currentCoroutineContext().isActive) {
                 IslandState.clearTransientIfExpired()
                 delay(200L)
             }

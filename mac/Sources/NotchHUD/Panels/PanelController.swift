@@ -9,6 +9,7 @@ final class PanelController: NSObject {
     private var panels: [PanelEntry] = []
     private var cancellables = Set<AnyCancellable>()
     private var outsideMonitor: Any?
+    private var lastExternalMode: ExternalMode = Settings.shared.externalMode
 
     private struct PanelEntry {
         let panel: HUDPanel
@@ -31,10 +32,19 @@ final class PanelController: NSObject {
             .sink { [weak self] mode in self?.resize(for: mode) }
             .store(in: &cancellables)
 
+        // Only the external-display mode changes a panel's geometry. Rebuilding on
+        // every settings write would tear down and recreate every panel whenever
+        // the user flipped a toggle — the SwiftUI views already observe the rest.
         Settings.shared.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                DispatchQueue.main.async { self?.rebuild() }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    let mode = Settings.shared.externalMode
+                    guard mode != self.lastExternalMode else { return }
+                    self.lastExternalMode = mode
+                    self.rebuild()
+                }
             }
             .store(in: &cancellables)
 
@@ -111,12 +121,10 @@ final class PanelController: NSObject {
 
     /// Collapse the expanded panel when the user clicks anywhere else.
     private func installOutsideClickMonitor() {
-        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                _ = self
-                HUDState.shared.collapse()
-            }
+        // A global monitor only sees events delivered to *other* apps, which is
+        // exactly what "clicked somewhere else" means here.
+        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
+            Task { @MainActor in HUDState.shared.collapse() }
         }
     }
 }

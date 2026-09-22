@@ -33,7 +33,7 @@ class SystemEventReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val theme = ServiceRuntime.settings?.theme
+        val theme = ServiceRuntime.current.theme
         when (intent.action) {
             Intent.ACTION_POWER_CONNECTED -> {
                 val pct = batteryPercent(context)

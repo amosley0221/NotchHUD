@@ -16,12 +16,12 @@ import com.notchhud.island.core.Transient
 object NotificationRouter {
 
     fun route(listener: IslandNotificationListener, item: InboxItem) {
-        val settings = ServiceRuntime.settings ?: return
+        val settings = ServiceRuntime.current
         val module = listener.moduleFor(item.kind)
 
         if (settings.modules[module] == false) return
 
-        val quiet = ServiceRuntime.quietActive
+        val quiet = ServiceRuntime.isQuiet
         if (quiet && module !in settings.breakthrough) {
             IslandState.setHeldCount(IslandState.heldCount.value + 1)
             return
@@ -54,9 +54,9 @@ object NotificationRouter {
     }
 
     fun systemTransient(left: String, right: String?, color: Color, meter: Float? = null, durationMs: Long = 1400L) {
-        val settings = ServiceRuntime.settings ?: return
+        val settings = ServiceRuntime.current
         if (settings.modules[Modules.SYSTEM] == false) return
-        if (ServiceRuntime.quietActive && Modules.SYSTEM !in settings.breakthrough) return
+        if (ServiceRuntime.isQuiet && Modules.SYSTEM !in settings.breakthrough) return
         IslandState.showTransient(Transient(left, right, color, meter = meter, durationMs = durationMs))
     }
 }

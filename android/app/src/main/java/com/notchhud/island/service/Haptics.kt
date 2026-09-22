@@ -22,7 +22,7 @@ class Haptics(context: Context) {
     fun confirm() = play(VibrationEffect.EFFECT_CLICK, 20L)
 
     private fun play(predefined: Int, fallbackMs: Long) {
-        if (ServiceRuntime.settings?.haptics == false) return
+        if (!ServiceRuntime.current.haptics) return
         val v = vibrator ?: return
         if (!v.hasVibrator()) return
         runCatching {

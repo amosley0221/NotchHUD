@@ -20,7 +20,7 @@ class IslandApp : Application() {
         // Seed ServiceRuntime early: the notification listener can start before the
         // overlay service does, and it needs the module/Quiet rules to gate on.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            ServiceRuntime.settings = settings.flow.first()
+            ServiceRuntime.update(settings.flow.first())
         }
     }
 }

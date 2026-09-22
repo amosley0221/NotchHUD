@@ -3,6 +3,14 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.1
+
+Two reactivity bugs found reviewing the first build.
+
+- **The island now redraws when you change a setting.** `ServiceRuntime` held the settings snapshot in a plain field, which Compose cannot observe, so changing the theme, the island size or the hold duration did nothing visible until some unrelated state happened to force a recomposition. It is a `StateFlow` now, and the island collects it.
+- **macOS no longer rebuilds every HUD panel on every settings write.** Any `@AppStorage` change — including toggling Quiet — tore down and recreated the panel on each screen. Only the external-display mode actually changes panel geometry, so only that triggers a rebuild; the SwiftUI views already observe everything else.
+- Polling loops check their own coroutine for cancellation rather than the service-wide scope, so a settings change stops the old poller deterministically.
+
 ## 1.0.0
 
 First build of both apps from the design handoff.

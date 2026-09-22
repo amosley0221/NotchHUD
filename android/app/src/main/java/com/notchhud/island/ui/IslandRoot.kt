@@ -56,7 +56,9 @@ fun IslandRoot(
     onToggleQuiet: () -> Unit,
     onMeasured: () -> Unit,
 ) {
-    val settings = ServiceRuntime.settings ?: SettingsSnapshot()
+    // Collected, not read: a plain field would be invisible to Compose and the
+    // island would not redraw when the theme or island size changes.
+    val settings by ServiceRuntime.settings.collectAsState()
 
     val view by IslandState.view.collectAsState()
     val locked by IslandState.locked.collectAsState()
