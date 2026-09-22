@@ -205,12 +205,14 @@ data class CutoutGeometry(
     val centerX: Int,
     val centerY: Int,
     val width: Int,
+    /** Height of the cutout in px. The pill has to be at least this tall to hide it. */
+    val height: Int = 0,
     val screenWidth: Int,
     val screenHeight: Int,
     val folded: Boolean,
 ) {
     companion object {
-        val UNKNOWN = CutoutGeometry(0, 0, 0, 0, 0, true)
+        val UNKNOWN = CutoutGeometry(0, 0, 0, 0, 0, 0, true)
     }
 
     val hasCutout: Boolean get() = width > 0

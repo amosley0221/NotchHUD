@@ -147,6 +147,8 @@ class IslandOverlayService : LifecycleService() {
             startTransientReaper()
             startLockMonitor()
             overlayContext.registerComponentCallbacks(overlayConfigCallback)
+            getSystemService(DisplayManager::class.java)
+                .registerDisplayListener(displayListener, null)
         } catch (t: Throwable) {
             CrashReporter.record(this, "island startup", t)
             stopSelf()
@@ -170,6 +172,9 @@ class IslandOverlayService : LifecycleService() {
         companion?.close()
         systemReceiver?.let { runCatching { unregisterReceiver(it) } }
         runCatching { overlayContext.unregisterComponentCallbacks(overlayConfigCallback) }
+        runCatching {
+            getSystemService(DisplayManager::class.java).unregisterDisplayListener(displayListener)
+        }
         removeOverlay()
         super.onDestroy()
     }
@@ -177,6 +182,18 @@ class IslandOverlayService : LifecycleService() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         refreshGeometry()
+    }
+
+    /**
+     * Folding changes the display, not the configuration of the context we happen
+     * to hold, so onConfigurationChanged alone missed it and the island kept using
+     * the other screen's geometry — including the other screen's nudge.
+     * DisplayListener fires on exactly this.
+     */
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayChanged(displayId: Int) = refreshGeometry()
+        override fun onDisplayAdded(displayId: Int) = refreshGeometry()
+        override fun onDisplayRemoved(displayId: Int) = refreshGeometry()
     }
 
     /** Fold, unfold or rotate: re-read the cutout and re-place the window. */
@@ -324,12 +341,15 @@ class IslandOverlayService : LifecycleService() {
 
             // Pill top = cutout centre − half the pill height, so the camera sits
             // vertically centred inside the black shape.
-            val marginPx2 = Tokens.TouchMargin.value * density
-            val pillHeightPx = ServiceRuntime.current.islandSize.pillHeightDp * density
+            val cutoutHeightPx = geo.height.toFloat()
+            val pillHeightPx = maxOf(
+                ServiceRuntime.current.islandSize.pillHeightDp * density,
+                cutoutHeightPx + 10f * density,
+            )
             val maxY = (geo.screenHeight - pillHeightPx.toInt() - marginPx).coerceAtLeast(0)
-            // The window carries a transparent touch margin, so the pill sits that far
-            // inside it — offset by the margin to keep the pill on the camera.
-            val y = (geo.centerY - pillHeightPx / 2 - marginPx2).toInt().coerceIn(0, maxY)
+            // The pill hugs the top of its window now, so centring the window on the
+            // cutout centres the pill on the camera.
+            val y = (geo.centerY - pillHeightPx / 2).toInt().coerceIn(0, maxY)
 
             if (params.x != x || params.y != y) {
                 params.x = x
@@ -621,6 +641,15 @@ class IslandOverlayService : LifecycleService() {
                         IslandState.setLocked(false)
                     }
                 }
+                // Cheap safety net for any fold or rotation the callbacks miss. The
+                // read no longer depends on where the window is, so this cannot
+                // feed back into itself, and setCutout ignores an equal value.
+                val geometry = CutoutReader.read(this@IslandOverlayService)
+                if (geometry != IslandState.cutout.value) {
+                    IslandState.setCutout(geometry)
+                    updateWindowPosition()
+                }
+
                 delay(600L)
             }
         }

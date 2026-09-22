@@ -156,7 +156,7 @@ fun IslandRoot(
                     onLongPress = { onHold() },
                 )
             }
-            .padding(Tokens.TouchMargin)
+            .padding(start = Tokens.TouchMargin, end = Tokens.TouchMargin, bottom = Tokens.TouchMargin)
     ) {
     Box(
         Modifier
@@ -174,6 +174,7 @@ fun IslandRoot(
                     unlocking = unlocking,
                     settings = settings,
                     cutoutDp = cutoutDp,
+                    cutoutPx = cutout.height,
                 )
                 IslandView.DETAIL -> DetailContent(
                     settings = settings,

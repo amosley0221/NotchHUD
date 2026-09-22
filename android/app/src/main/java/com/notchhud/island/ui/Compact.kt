@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -42,8 +43,12 @@ fun CompactContent(
     unlocking: Boolean,
     settings: SettingsSnapshot,
     cutoutDp: Dp,
+    cutoutPx: Int,
 ) {
-    val height = settings.islandSize.pillHeightDp.dp
+    // Tall enough to hide the camera. A 34 dp pill cannot cover a 35 dp cutout, which
+    // is why the top of the lens was poking out above it.
+    val cutoutHeightDp = with(LocalDensity.current) { cutoutPx.toDp() }
+    val height = maxOf(settings.islandSize.pillHeightDp.dp, cutoutHeightDp + 10.dp)
 
     Row(
         Modifier

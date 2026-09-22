@@ -24,9 +24,10 @@ internal object Http {
     }
 
     fun get(url: String): Result = try {
-        client.newCall(
-            Request.Builder().url(url).header("User-Agent", "IslandHUD/1.0").build()
-        ).execute().use { response ->
+        // No custom User-Agent. ESPN's edge answers 403 to "IslandHUD/1.0" and to a
+        // Chrome-like string, but 200 to OkHttp's own default — which is what every
+        // league request was hitting.
+        client.newCall(Request.Builder().url(url).build()).execute().use { response ->
             val body = response.body?.string()
             when {
                 !response.isSuccessful -> Result.Failed("HTTP ${response.code}")

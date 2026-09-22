@@ -61,6 +61,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    /// Clicking the app in Finder when it is already running does nothing visible
+    /// for an agent app — no Dock icon, no window to bring forward. Treat it as a
+    /// request for Settings, which is the only reason to open it by hand.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        openSettings()
+        return true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         ShortcutService.shared.stop()
         SportsService.shared.stop()
