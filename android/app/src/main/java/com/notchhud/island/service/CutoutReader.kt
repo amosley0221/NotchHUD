@@ -1,29 +1,46 @@
 package com.notchhud.island.service
 
 import android.content.Context
+import android.hardware.display.DisplayManager
 import android.os.Build
-import android.util.DisplayMetrics
+import android.view.Display
+import android.view.View
 import android.view.WindowManager
 import com.notchhud.island.core.CutoutGeometry
 
 /**
- * Reads the real camera cutout on every configuration change.
+ * Reads the real camera cutout.
  *
- * The Fold puts the punch-hole top-centre on the cover screen and near the top of
- * the right half on the inner screen, so this must never be cached across a fold
- * event and must never be hard-coded.
+ * Two things make this harder than it looks on a Fold.
  *
- * Note which WindowManager gets passed in: [WindowManager.getCurrentWindowMetrics]
- * is only valid on a *visual* context — an Activity, or one built with
- * `createWindowContext`. A plain Service context throws
- * `UnsupportedOperationException`, so the overlay service builds a window context
- * and hands us that one's WindowManager.
+ * First, [WindowManager.getCurrentWindowMetrics] is only valid on a *visual*
+ * context, and a Service is not one — it throws. A window context built on an
+ * explicit display is.
+ *
+ * Second, and the reason the island used to stay stuck in the middle of the inner
+ * screen: that window context must be built **fresh on every read**. A context
+ * made once at startup reports the geometry of the screen it was created for, so
+ * after unfolding it kept describing the cover screen — where the punch-hole
+ * really is top-centre. Nothing here is cached.
  */
 object CutoutReader {
 
-    fun read(context: Context, windowManager: WindowManager): CutoutGeometry {
-        val metrics = runCatching { screenSize(context, windowManager) }
-            .getOrElse { fallbackSize(context) }
+    /** Preferred path: ask the attached overlay view, which is on the live display. */
+    fun read(context: Context, view: View?): CutoutGeometry {
+        val fromView = view?.let { readFromView(it) }
+        if (fromView != null && fromView.hasCutout) return fromView
+        return read(context)
+    }
+
+    fun read(context: Context): CutoutGeometry {
+        val windowContext = windowContext(context)
+        val windowManager = windowContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+        val (screenW, screenH) = runCatching { screenSize(windowManager) }
+            .getOrElse {
+                val metrics = context.resources.displayMetrics
+                metrics.widthPixels to metrics.heightPixels
+            }
 
         val cutout = runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -34,17 +51,27 @@ object CutoutReader {
             }
         }.getOrNull()
 
-        val (screenW, screenH) = metrics
+        return geometry(
+            rect = cutout?.boundingRects?.maxByOrNull { it.width().toLong() * it.height().toLong() },
+            screenW = screenW,
+            screenH = screenH,
+        )
+    }
 
-        // The largest cutout rect, wherever it sits. This used to be filtered to the
-        // top quarter of the screen, which is wrong on a Fold: unfolded and held
-        // sideways the punch-hole is against a side edge, the filter rejected it,
-        // and the island fell back to top-centre — nowhere near the camera.
-        val rect = cutout?.boundingRects?.maxByOrNull { it.width().toLong() * it.height().toLong() }
+    private fun readFromView(view: View): CutoutGeometry? {
+        val insets = view.rootWindowInsets ?: return null
+        val cutout = insets.displayCutout ?: return null
+        val rect = cutout.boundingRects.maxByOrNull { it.width().toLong() * it.height().toLong() }
+            ?: return null
 
+        val metrics = view.context.resources.displayMetrics
+        return geometry(rect, metrics.widthPixels, metrics.heightPixels)
+    }
+
+    private fun geometry(rect: android.graphics.Rect?, screenW: Int, screenH: Int): CutoutGeometry {
         // A Fold is "open" when the window is close to square; the cover screen is
-        // a tall 23:9 strip. Cheaper and more reliable across OEM skins than
-        // subscribing to FoldingFeature just to answer this one question.
+        // a tall strip. Cheaper and steadier across OEM skins than subscribing to
+        // FoldingFeature just to answer this one question.
         val aspect = if (screenH > 0) screenW.toFloat() / screenH.toFloat() else 0.5f
         val folded = aspect < 0.62f
 
@@ -58,7 +85,6 @@ object CutoutReader {
                 folded = folded,
             )
         } else {
-            // No cutout, or we could not read one: centre a plain pill at the top.
             CutoutGeometry(
                 centerX = screenW / 2,
                 centerY = 0,
@@ -70,7 +96,22 @@ object CutoutReader {
         }
     }
 
-    private fun screenSize(context: Context, windowManager: WindowManager): Pair<Int, Int> =
+    /**
+     * A fresh window context, every time. `createWindowContext(type, options)`
+     * infers its display by calling `getDisplay()` on the receiver, which a Service
+     * does not have, so the display is named explicitly first.
+     */
+    private fun windowContext(context: Context): Context {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return context
+        return runCatching {
+            val displays = context.getSystemService(DisplayManager::class.java)
+            val display = displays.getDisplay(Display.DEFAULT_DISPLAY)
+            context.createDisplayContext(display)
+                .createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+        }.getOrDefault(context)
+    }
+
+    private fun screenSize(windowManager: WindowManager): Pair<Int, Int> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val bounds = windowManager.currentWindowMetrics.bounds
             bounds.width() to bounds.height()
@@ -81,10 +122,4 @@ object CutoutReader {
             val point = android.graphics.Point().also { display.getRealSize(it) }
             point.x to point.y
         }
-
-    /** Last resort if the window metrics are unavailable — never crash over geometry. */
-    private fun fallbackSize(context: Context): Pair<Int, Int> {
-        val metrics: DisplayMetrics = context.resources.displayMetrics
-        return metrics.widthPixels to metrics.heightPixels
-    }
 }

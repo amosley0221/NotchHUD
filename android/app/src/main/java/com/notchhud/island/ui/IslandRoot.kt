@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -139,13 +140,11 @@ fun IslandRoot(
     // Press-scale cue while the user holds, before the hold threshold trips.
     val press = remember { Animatable(1f) }
 
+    // The gesture and the measured size belong to the outer box: its padding is
+    // transparent but still takes touches, which is what makes a pill barely wider
+    // than the camera possible to hold without slipping off it.
     Box(
         Modifier
-            .widthIn(min = 80.dp)
-            .width(width)
-            .scale(bounce.value * press.value)
-            .clip(shape)
-            .background(Tokens.Pill)
             .onSizeChanged { onMeasured() }
             .pointerInput(settings.holdMs, settings.tapShowsDetail) {
                 detectTapGestures(
@@ -157,6 +156,15 @@ fun IslandRoot(
                     onLongPress = { onHold() },
                 )
             }
+            .padding(Tokens.TouchMargin)
+    ) {
+    Box(
+        Modifier
+            .widthIn(min = 80.dp)
+            .width(width)
+            .scale(bounce.value * press.value)
+            .clip(shape)
+            .background(Tokens.Pill)
     ) {
         Column(Modifier.fillMaxWidth()) {
             when (view) {
@@ -193,6 +201,7 @@ fun IslandRoot(
             }
             GlowRail(railColor)
         }
+    }
     }
 
     // The unlock flourish resolves back to the normal pill by itself.

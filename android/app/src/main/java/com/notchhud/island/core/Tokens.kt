@@ -40,6 +40,11 @@ object Tokens {
     val ButtonRadius = 8.dp
     val DotSize = 8.dp
 
+    /// Transparent margin around the pill that still takes touches. The idle pill
+    /// is barely wider than the camera, which is a hard target to long-press
+    /// without drifting off it and cancelling the gesture.
+    val TouchMargin = 12.dp
+
     // Motion (ms)
     const val WidthMs = 320
     const val FadeMs = 220

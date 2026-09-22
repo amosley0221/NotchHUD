@@ -31,6 +31,7 @@ import com.notchhud.island.core.Modules
 import com.notchhud.island.core.SettingsRepository
 import com.notchhud.island.core.SettingsSnapshot
 import com.notchhud.island.core.SportsMode
+import com.notchhud.island.core.Tokens
 import com.notchhud.island.data.CalendarRepository
 import com.notchhud.island.data.EspnRepository
 import com.notchhud.island.data.LocationProvider
@@ -134,7 +135,7 @@ class IslandOverlayService : LifecycleService() {
             mediaMonitor = MediaMonitor(applicationContext)
             haptics = Haptics(applicationContext)
 
-            IslandState.setCutout(CutoutReader.read(overlayContext, windowManager))
+            IslandState.setCutout(CutoutReader.read(this))
             IslandState.setLocked(
                 (getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
             )
@@ -181,7 +182,7 @@ class IslandOverlayService : LifecycleService() {
     /** Fold, unfold or rotate: re-read the cutout and re-place the window. */
     private fun refreshGeometry() {
         if (!::windowManager.isInitialized) return
-        IslandState.setCutout(CutoutReader.read(overlayContext, windowManager))
+        IslandState.setCutout(CutoutReader.read(this, rootView))
         updateWindowPosition()
     }
 
@@ -266,6 +267,14 @@ class IslandOverlayService : LifecycleService() {
         }
         container.addView(compose)
 
+        // Insets change on fold, unfold and rotation, and arrive on the view that is
+        // actually on the live display — a more trustworthy signal than a
+        // configuration callback on a context created at startup.
+        container.setOnApplyWindowInsetsListener { _, insets ->
+            refreshGeometry()
+            insets
+        }
+
         // The owners must be on the view handed to WindowManager, not only on the
         // ComposeView. Compose resolves its recomposer from the *root* view of the
         // window, so it looks for the lifecycle owner starting at the container;
@@ -317,9 +326,12 @@ class IslandOverlayService : LifecycleService() {
 
             // Pill top = cutout centre − half the pill height, so the camera sits
             // vertically centred inside the black shape.
+            val marginPx2 = Tokens.TouchMargin.value * density
             val pillHeightPx = ServiceRuntime.current.islandSize.pillHeightDp * density
             val maxY = (geo.screenHeight - pillHeightPx.toInt() - marginPx).coerceAtLeast(0)
-            val y = (geo.centerY - pillHeightPx / 2).toInt().coerceIn(0, maxY)
+            // The window carries a transparent touch margin, so the pill sits that far
+            // inside it — offset by the margin to keep the pill on the camera.
+            val y = (geo.centerY - pillHeightPx / 2 - marginPx2).toInt().coerceIn(0, maxY)
 
             if (params.x != x || params.y != y) {
                 params.x = x

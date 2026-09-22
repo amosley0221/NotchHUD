@@ -3,6 +3,20 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.11
+
+- **The island finds the camera on the unfolded screen.** The 1.0.6 fix was right
+  about which cutout rect to take and wrong about where to ask. The window context
+  it asked through was built once at startup with `createDisplayContext`, which pins
+  it to the screen it was created for — so after unfolding it kept describing the
+  cover screen, where the punch-hole genuinely is top-centre. Geometry is now read
+  through a context built fresh on every read, preferring the attached overlay
+  view's own insets, and a window-insets listener refreshes it on every fold,
+  unfold and rotation.
+- **Hold is easier to land.** The idle pill is barely wider than the camera, and a
+  long press that drifted a few pixels off it cancelled with no feedback. The window
+  now carries a 12 dp transparent margin that still takes touches.
+
 ## 1.0.10
 
 - **The HUD sizes itself to the screen it is on.** In notch-shape mode it overlaps
