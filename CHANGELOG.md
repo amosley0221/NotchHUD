@@ -3,6 +3,14 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.9
+
+- **Settings is reachable without hunting for the menu bar icon.** `notchhud://settings`
+  opens it, so `open notchhud://settings` works from anywhere, and the CLI gained a
+  `notchhud settings` command. The app has no Dock icon and its menu bar item can
+  end up behind the notch or in an overflow, which left no obvious way in once the
+  one-shot first-launch window had been used.
+
 ## 1.0.8
 
 - **"Load teams" works, and says what it is doing.** It fetched each league one

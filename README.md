@@ -20,7 +20,11 @@ Every build is published on the [Releases page](https://github.com/amosley0221/N
 xattr -dr com.apple.quarantine /Applications/NotchHUD.app
 ```
 
-The app has no Dock icon — it lives in the menu bar. Settings opens by itself on the first launch.
+The app has no Dock icon — it lives in the menu bar, and Settings opens by itself on the first launch. To reach Settings at any time, click the menu bar icon, or run:
+
+```bash
+open notchhud://settings
+```
 
 The `notchhud` CLI ships inside the bundle. To put it on your PATH:
 

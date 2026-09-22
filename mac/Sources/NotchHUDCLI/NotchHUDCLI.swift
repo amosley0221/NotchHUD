@@ -22,6 +22,9 @@ enum NotchHUDCLI {
         let rest = Array(arguments.dropFirst())
 
         switch command {
+        case "settings":
+            open("notchhud://settings")
+
         case "emit":
             guard let payload = rest.first else { usage() }
             send(payload)
@@ -60,6 +63,7 @@ enum NotchHUDCLI {
         FileHandle.standardError.write(Data("""
         notchhud — push agent state into the Notch HUD
 
+          notchhud settings
           notchhud emit '<json>'
           notchhud running    <id> [name] [task]
           notchhud permission <id> <ask> [command] [name]
@@ -71,6 +75,15 @@ enum NotchHUDCLI {
 
         """.utf8))
         exit(2)
+    }
+
+    /// Hands a URL to LaunchServices, which routes it to the running app.
+    static func open(_ urlString: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = [urlString]
+        try? process.run()
+        process.waitUntilExit()
     }
 
     static func send(_ json: String) {

@@ -71,6 +71,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func handleURLEvent(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
         guard let string = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
               let url = URL(string: string) else { return }
+
+        // notchhud://settings — an escape hatch that does not depend on finding the
+        // menu bar icon, which can hide behind the notch or a crowded menu bar.
+        if url.host == "settings" {
+            openSettings()
+            return
+        }
+
         AgentBridge.shared.handle(url: url)
     }
 
