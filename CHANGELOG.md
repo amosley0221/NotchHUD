@@ -3,6 +3,24 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.12
+
+- **The island no longer flashes between two positions after folding.** The
+  window-insets listener added in 1.0.11 was a feedback loop: a small overlay window
+  only reports a display cutout when it happens to overlap one, so asking the view
+  where the camera is made the answer depend on where the window already was.
+  Placing the island moved it out from under the cutout, the answer changed back,
+  and it oscillated. Geometry now comes only from display-level window metrics,
+  which do not depend on the window's own position.
+- **The island's position can be set by hand.** Settings → Island position prints
+  the numbers the app is actually working from — screen size, whether a cutout was
+  reported at all, and where — and offers a nudge slider. The cover screen and the
+  unfolded screen are stored separately, because the camera is in a different place
+  on each.
+- **Network failures say why.** "Could not reach" for all eight leagues at once was
+  equally consistent with a blocked request, a DNS failure or an HTTP error; the
+  reason was being discarded. Each league now reports its own.
+
 ## 1.0.11
 
 - **The island finds the camera on the unfolded screen.** The 1.0.6 fix was right
