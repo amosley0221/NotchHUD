@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -47,6 +48,10 @@ private struct GeneralPane: View {
                 Toggle("Use Celsius", isOn: $settings.useCelsius)
             }
 
+            Section("Startup") {
+                LaunchAtLoginRow()
+            }
+
             Section("Updates") {
                 UpdateRow()
             }
@@ -65,6 +70,40 @@ private struct GeneralPane: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Launch at login, via the modern login-item API. No helper bundle, no
+/// legacy login-items list — macOS 13 onwards registers the app itself.
+private struct LaunchAtLoginRow: View {
+    @State private var enabled = SMAppService.mainApp.status == .enabled
+    @State private var problem: String?
+
+    var body: some View {
+        Toggle("Launch at login", isOn: Binding(get: { enabled }, set: { apply($0) }))
+        if let problem {
+            Text(problem).font(.caption).foregroundStyle(.secondary)
+        } else if enabled {
+            Text("Notch HUD starts with you, in the menu bar.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func apply(_ wanted: Bool) {
+        do {
+            if wanted {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            enabled = SMAppService.mainApp.status == .enabled
+            problem = nil
+        } catch {
+            // The usual cause is the app sitting somewhere macOS will not register
+            // from, such as Downloads or a translocated copy.
+            problem = "Could not change it — \(error.localizedDescription). Make sure the app is in /Applications."
+            enabled = SMAppService.mainApp.status == .enabled
+        }
     }
 }
 

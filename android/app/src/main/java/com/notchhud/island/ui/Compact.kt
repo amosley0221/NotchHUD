@@ -48,7 +48,7 @@ fun CompactContent(
     // Tall enough to hide the camera. A 34 dp pill cannot cover a 35 dp cutout, which
     // is why the top of the lens was poking out above it.
     val cutoutHeightDp = with(LocalDensity.current) { cutoutPx.toDp() }
-    val height = maxOf(settings.islandSize.pillHeightDp.dp, cutoutHeightDp + 10.dp)
+    val height = maxOf(settings.islandSize.pillHeightDp.dp, cutoutHeightDp + settings.pillPadding.dp * 2)
 
     Row(
         Modifier

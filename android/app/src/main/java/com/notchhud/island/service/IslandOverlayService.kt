@@ -344,12 +344,13 @@ class IslandOverlayService : LifecycleService() {
             val cutoutHeightPx = geo.height.toFloat()
             val pillHeightPx = maxOf(
                 ServiceRuntime.current.islandSize.pillHeightDp * density,
-                cutoutHeightPx + 10f * density,
+                cutoutHeightPx + settings.pillPadding * 2 * density,
             )
             val maxY = (geo.screenHeight - pillHeightPx.toInt() - marginPx).coerceAtLeast(0)
             // The pill hugs the top of its window now, so centring the window on the
             // cutout centres the pill on the camera.
-            val y = (geo.centerY - pillHeightPx / 2).toInt().coerceIn(0, maxY)
+            val offsetY = if (geo.folded) settings.offsetYFolded else settings.offsetYUnfolded
+            val y = (geo.centerY - pillHeightPx / 2 + offsetY * density).toInt().coerceIn(0, maxY)
 
             if (params.x != x || params.y != y) {
                 params.x = x

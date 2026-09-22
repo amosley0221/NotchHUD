@@ -222,6 +222,7 @@ private fun IslandPositionSection(settings: SettingsSnapshot, repo: SettingsRepo
 
     val screenLabel = if (cutout.folded) "Cover screen" else "Unfolded screen"
     val offset = if (cutout.folded) settings.offsetFolded else settings.offsetUnfolded
+    val offsetY = if (cutout.folded) settings.offsetYFolded else settings.offsetYUnfolded
 
     Text(
         buildString {
@@ -231,7 +232,7 @@ private fun IslandPositionSection(settings: SettingsSnapshot, repo: SettingsRepo
                     cutout.centerX * 100 / cutout.screenWidth
                 } else 0
                 append("Camera reported at x=${cutout.centerX} ($percent% across), ")
-                append("y=${cutout.centerY}, ${cutout.width} px wide")
+                append("y=${cutout.centerY}, ${cutout.width} × ${cutout.height} px")
             } else {
                 append("No camera cutout reported on this screen — the island is centred.")
             }
@@ -254,12 +255,45 @@ private fun IslandPositionSection(settings: SettingsSnapshot, repo: SettingsRepo
         valueRange = -0.45f..0.45f,
         modifier = Modifier.fillMaxWidth(),
     )
+    Text(
+        "Vertical position (${offsetY.toInt()} dp)",
+        fontSize = 12.sp,
+        fontWeight = FontWeight.W500,
+    )
+    Slider(
+        value = offsetY,
+        onValueChange = { value ->
+            scope.launch {
+                if (cutout.folded) repo.setOffsetYFolded(value) else repo.setOffsetYUnfolded(value)
+            }
+        },
+        valueRange = -30f..30f,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    Text(
+        "Height around the camera (${settings.pillPadding.toInt()} dp each side)",
+        fontSize = 12.sp,
+        fontWeight = FontWeight.W500,
+    )
+    Slider(
+        value = settings.pillPadding,
+        onValueChange = { scope.launch { repo.setPillPadding(it) } },
+        valueRange = 0f..20f,
+        modifier = Modifier.fillMaxWidth(),
+    )
+
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = {
             scope.launch {
-                if (cutout.folded) repo.setOffsetFolded(0f) else repo.setOffsetUnfolded(0f)
+                if (cutout.folded) {
+                    repo.setOffsetFolded(0f); repo.setOffsetYFolded(0f)
+                } else {
+                    repo.setOffsetUnfolded(0f); repo.setOffsetYUnfolded(0f)
+                }
+                repo.setPillPadding(6f)
             }
-        }) { Text("Centre") }
+        }) { Text("Reset") }
     }
     Text(
         "Applies to the $screenLabel only. Fold or unfold and this section follows.",

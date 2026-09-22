@@ -41,6 +41,12 @@ data class SettingsSnapshot(
     /// two screens because the camera is in a different place on each.
     val offsetFolded: Float = 0f,
     val offsetUnfolded: Float = 0f,
+    /// Vertical nudge in dp. The camera is inset from the top edge by a different
+    /// amount on each screen, so the pill needs to be placeable too.
+    val offsetYFolded: Float = 0f,
+    val offsetYUnfolded: Float = 0f,
+    /// Extra height around the cutout, in dp.
+    val pillPadding: Float = 6f,
     val useCelsius: Boolean = false,
     val quietFollowsDnd: Boolean = true,
     val quietOnCall: Boolean = true,
@@ -108,6 +114,9 @@ class SettingsRepository(private val context: Context) {
         val useDeviceLocation = booleanPreferencesKey("use_device_location")
         val offsetFolded = floatPreferencesKey("offset_folded")
         val offsetUnfolded = floatPreferencesKey("offset_unfolded")
+        val offsetYFolded = floatPreferencesKey("offset_y_folded")
+        val offsetYUnfolded = floatPreferencesKey("offset_y_unfolded")
+        val pillPadding = floatPreferencesKey("pill_padding")
         val useCelsius = booleanPreferencesKey("use_celsius")
         val quietFollowsDnd = booleanPreferencesKey("quiet_dnd")
         val quietOnCall = booleanPreferencesKey("quiet_call")
@@ -139,6 +148,9 @@ class SettingsRepository(private val context: Context) {
             useDeviceLocation = p[Keys.useDeviceLocation] ?: false,
             offsetFolded = p[Keys.offsetFolded] ?: 0f,
             offsetUnfolded = p[Keys.offsetUnfolded] ?: 0f,
+            offsetYFolded = p[Keys.offsetYFolded] ?: 0f,
+            offsetYUnfolded = p[Keys.offsetYUnfolded] ?: 0f,
+            pillPadding = p[Keys.pillPadding] ?: 6f,
             useCelsius = p[Keys.useCelsius] ?: false,
             quietFollowsDnd = p[Keys.quietFollowsDnd] ?: true,
             quietOnCall = p[Keys.quietOnCall] ?: true,
@@ -164,6 +176,9 @@ class SettingsRepository(private val context: Context) {
     suspend fun setUseDeviceLocation(v: Boolean) = edit { it[Keys.useDeviceLocation] = v }
     suspend fun setOffsetFolded(v: Float) = edit { it[Keys.offsetFolded] = v }
     suspend fun setOffsetUnfolded(v: Float) = edit { it[Keys.offsetUnfolded] = v }
+    suspend fun setOffsetYFolded(v: Float) = edit { it[Keys.offsetYFolded] = v }
+    suspend fun setOffsetYUnfolded(v: Float) = edit { it[Keys.offsetYUnfolded] = v }
+    suspend fun setPillPadding(v: Float) = edit { it[Keys.pillPadding] = v }
     suspend fun setQuietFollowsDnd(v: Boolean) = edit { it[Keys.quietFollowsDnd] = v }
     suspend fun setQuietOnCall(v: Boolean) = edit { it[Keys.quietOnCall] = v }
     suspend fun setQuietManual(v: Boolean) = edit { it[Keys.quietManual] = v }
