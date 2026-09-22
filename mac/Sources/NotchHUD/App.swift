@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func handleUpdateMenuItem() {
-        Task {  in
+        Task { @MainActor in
             if UpdateService.shared.updateAvailable {
                 await UpdateService.shared.installAndRelaunch()
             } else {
