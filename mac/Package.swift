@@ -17,6 +17,6 @@ let package = Package(
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         ),
         // Tiny CLI that pushes agent events into the running app.
-        .executableTarget(name: "notchhud", path: "Sources/notchhud"),
+        .executableTarget(name: "notchhud", path: "Sources/NotchHUDCLI"),
     ]
 )

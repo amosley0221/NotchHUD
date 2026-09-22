@@ -53,8 +53,11 @@ final class AgentBridge {
         do {
             let listener = try NWListener(using: params, on: nwPort)
             listener.newConnectionHandler = { [weak self] connection in
-                connection.start(queue: .main)
-                self?.receiveLines(on: connection, buffer: Data())
+                // NWListener calls back on its own queue, not the main actor.
+                Task { @MainActor in
+                    connection.start(queue: .main)
+                    self?.receiveLines(on: connection, buffer: Data())
+                }
             }
             listener.start(queue: .main)
             agentListener = listener
