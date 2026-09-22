@@ -1,6 +1,5 @@
 package com.notchhud.island.service
 
-import android.content.Context
 import android.view.View
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -20,7 +19,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
  * An overlay window has none, so this supplies a minimal set of owners and hangs
  * them on the view tree.
  */
-class OverlayViewHost(context: Context) : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+class OverlayViewHost : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateController = SavedStateRegistryController.create(this)

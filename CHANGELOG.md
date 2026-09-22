@@ -3,6 +3,26 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.2
+
+Fixes the crash on starting the island.
+
+- **The overlay now builds from a window context.** `CutoutReader` asked a plain
+  Service context for `getCurrentWindowMetrics`, which is only legal on a visual
+  context — an Activity, or one from `createWindowContext`. On a Service it throws
+  `UnsupportedOperationException`, and it was the first thing the service did after
+  going foreground, so the app died before the island was ever added to the screen.
+  The service now creates a `TYPE_APPLICATION_OVERLAY` window context and uses it
+  for the metrics, the window, the Compose view and the density.
+- **Reading the cutout can no longer take the app down.** Each geometry read falls
+  back to the display metrics, and an unreadable cutout draws a plain centred pill
+  instead of failing.
+- **Startup failures are reported instead of vanishing.** An uncaught exception is
+  written to a file and the setup screen shows it on next launch, with a Copy
+  button — an overlay service otherwise dies with nothing on screen to explain it.
+  Failing to add the overlay window (usually a revoked permission) is recorded the
+  same way.
+
 ## 1.0.1
 
 Two reactivity bugs found reviewing the first build.

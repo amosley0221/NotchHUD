@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.notchhud.island.R
+import com.notchhud.island.core.CrashReporter
 import com.notchhud.island.core.IslandState
 import com.notchhud.island.core.IslandView
 import com.notchhud.island.core.Modules
@@ -64,6 +65,17 @@ class IslandOverlayService : LifecycleService() {
             private set
     }
 
+    // An overlay must be built from a window context on Android 11+: it is what
+    // makes getCurrentWindowMetrics legal and what gives the view the right
+    // display and density. A plain Service context throws.
+    private val overlayContext: Context by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+        } else {
+            this
+        }
+    }
+
     private lateinit var windowManager: WindowManager
     private lateinit var settingsRepo: SettingsRepository
     private lateinit var mediaMonitor: MediaMonitor
@@ -85,23 +97,32 @@ class IslandOverlayService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         running = true
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        windowManager = overlayContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         settingsRepo = SettingsRepository(applicationContext)
         mediaMonitor = MediaMonitor(applicationContext)
         haptics = Haptics(applicationContext)
 
         startForeground(NOTIFICATION_ID, buildNotification())
 
-        IslandState.setCutout(CutoutReader.read(this))
-        IslandState.setLocked(
-            (getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
-        )
+        // Everything past this point touches window geometry, OEM-specific
+        // behaviour and permissions that can be revoked while we run. A failure
+        // here would otherwise kill the process with nothing on screen to explain
+        // it, so record it where the setup screen can show it and stop cleanly.
+        try {
+            IslandState.setCutout(CutoutReader.read(overlayContext, windowManager))
+            IslandState.setLocked(
+                (getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
+            )
 
-        addOverlay()
-        registerSystemReceiver()
-        mediaMonitor.start()
-        observeSettings()
-        startTransientReaper()
+            addOverlay()
+            registerSystemReceiver()
+            mediaMonitor.start()
+            observeSettings()
+            startTransientReaper()
+        } catch (t: Throwable) {
+            CrashReporter.record(this, "island startup", t)
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -126,7 +147,7 @@ class IslandOverlayService : LifecycleService() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         // Fold, unfold or rotate: re-read the cutout and re-place the window.
-        IslandState.setCutout(CutoutReader.read(this))
+        IslandState.setCutout(CutoutReader.read(overlayContext, windowManager))
         updateWindowPosition()
     }
 
@@ -166,8 +187,8 @@ class IslandOverlayService : LifecycleService() {
     }
 
     private fun addOverlay() {
-        val viewHost = OverlayViewHost(this)
-        val compose = ComposeView(this).apply {
+        val viewHost = OverlayViewHost()
+        val compose = ComposeView(overlayContext).apply {
             setContent {
                 IslandRoot(
                     onTap = ::onIslandTap,
@@ -190,7 +211,7 @@ class IslandOverlayService : LifecycleService() {
         viewHost.attachTo(compose)
         viewHost.onStart()
 
-        val container = object : android.widget.FrameLayout(this) {
+        val container = object : android.widget.FrameLayout(overlayContext) {
             override fun onTouchEvent(event: MotionEvent): Boolean {
                 // Tapping anywhere off the island collapses it back to compact.
                 if (event.action == MotionEvent.ACTION_OUTSIDE) {
@@ -205,7 +226,13 @@ class IslandOverlayService : LifecycleService() {
         container.addView(compose)
 
         runCatching { windowManager.addView(container, layoutParams()) }
-            .onFailure { stopSelf() }
+            .onFailure { error ->
+                // Almost always the overlay permission being absent or revoked.
+                CrashReporter.record(this, "adding the overlay window", error)
+                viewHost.onStop()
+                stopSelf()
+                return
+            }
 
         host = viewHost
         rootView = container
@@ -227,7 +254,7 @@ class IslandOverlayService : LifecycleService() {
     private fun updateWindowPosition() {
         val view = rootView ?: return
         val geo = IslandState.cutout.value
-        val density = resources.displayMetrics.density
+        val density = overlayContext.resources.displayMetrics.density
         val marginPx = (8 * density).toInt()
 
         view.post {

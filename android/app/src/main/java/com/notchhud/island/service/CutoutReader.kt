@@ -2,6 +2,7 @@ package com.notchhud.island.service
 
 import android.content.Context
 import android.os.Build
+import android.util.DisplayMetrics
 import android.view.WindowManager
 import com.notchhud.island.core.CutoutGeometry
 
@@ -10,31 +11,30 @@ import com.notchhud.island.core.CutoutGeometry
  *
  * The Fold puts the punch-hole top-centre on the cover screen and near the top of
  * the right half on the inner screen, so this must never be cached across a fold
- * event and must never be hard-coded. When a device has no cutout at all we fall
- * back to top-centre with zero width, which draws a plain pill.
+ * event and must never be hard-coded.
+ *
+ * Note which WindowManager gets passed in: [WindowManager.getCurrentWindowMetrics]
+ * is only valid on a *visual* context — an Activity, or one built with
+ * `createWindowContext`. A plain Service context throws
+ * `UnsupportedOperationException`, so the overlay service builds a window context
+ * and hands us that one's WindowManager.
  */
 object CutoutReader {
 
-    fun read(context: Context): CutoutGeometry {
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    fun read(context: Context, windowManager: WindowManager): CutoutGeometry {
+        val metrics = runCatching { screenSize(context, windowManager) }
+            .getOrElse { fallbackSize(context) }
 
-        val (screenW, screenH) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val b = wm.currentWindowMetrics.bounds
-            b.width() to b.height()
-        } else {
-            @Suppress("DEPRECATION")
-            val d = wm.defaultDisplay
-            @Suppress("DEPRECATION")
-            val p = android.graphics.Point().also { d.getRealSize(it) }
-            p.x to p.y
-        }
+        val cutout = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                windowManager.currentWindowMetrics.windowInsets.displayCutout
+            } else {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay.cutout
+            }
+        }.getOrNull()
 
-        val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            wm.currentWindowMetrics.windowInsets.displayCutout
-        } else {
-            @Suppress("DEPRECATION")
-            wm.defaultDisplay.cutout
-        }
+        val (screenW, screenH) = metrics
 
         // Only the rect along the top edge is ours; a corner or waterfall cutout on
         // the side is not something the island should try to wrap.
@@ -56,6 +56,7 @@ object CutoutReader {
                 folded = folded,
             )
         } else {
+            // No cutout, or we could not read one: centre a plain pill at the top.
             CutoutGeometry(
                 centerX = screenW / 2,
                 centerY = 0,
@@ -65,5 +66,23 @@ object CutoutReader {
                 folded = folded,
             )
         }
+    }
+
+    private fun screenSize(context: Context, windowManager: WindowManager): Pair<Int, Int> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.currentWindowMetrics.bounds
+            bounds.width() to bounds.height()
+        } else {
+            @Suppress("DEPRECATION")
+            val display = windowManager.defaultDisplay
+            @Suppress("DEPRECATION")
+            val point = android.graphics.Point().also { display.getRealSize(it) }
+            point.x to point.y
+        }
+
+    /** Last resort if the window metrics are unavailable — never crash over geometry. */
+    private fun fallbackSize(context: Context): Pair<Int, Int> {
+        val metrics: DisplayMetrics = context.resources.displayMetrics
+        return metrics.widthPixels to metrics.heightPixels
     }
 }
