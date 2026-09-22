@@ -18,6 +18,11 @@ release's notes on the Releases page.
   much height sits around the camera, both stored per screen alongside the horizontal
   nudge. Default padding drops from 10 dp to 6 dp, and the diagnostic now reports the
   cutout's height as well as its width.
+- **NBA and MLB teams are in the picker again.** ESPN numbers teams per league, so
+  NFL team 1 and NBA team 1 are different teams. The picker deduplicated on the bare
+  id and silently deleted whole leagues — 129 teams came back where there should
+  have been several hundred. Keys are league-qualified now, and each team is labelled
+  with its league. Teams picked before this keep working.
 - **macOS can launch at login**, via `SMAppService` — no helper bundle needed.
 
 ## 1.0.13

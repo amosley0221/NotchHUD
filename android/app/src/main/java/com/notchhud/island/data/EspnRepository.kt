@@ -66,7 +66,12 @@ class EspnRepository {
             json.parseToJsonElement(body).jsonObject["sports"]!!.jsonArray[0].jsonObject["leagues"]!!
                 .jsonArray[0].jsonObject["teams"]!!.jsonArray.map { entry ->
                     val team = entry.jsonObject["team"]!!.jsonObject
-                    team["id"]!!.jsonPrimitive.content to team["displayName"]!!.jsonPrimitive.content
+                    // League-qualified. ESPN numbers teams per league, so NFL 1 and
+                    // NBA 1 are different teams — deduping on the bare id used to
+                    // delete whole leagues from the picker.
+                    val id = team["id"]!!.jsonPrimitive.content
+                    val name = team["displayName"]!!.jsonPrimitive.content
+                    "$leagueCode:$id" to "$name · $leagueCode"
                 }
         }.getOrNull()
 
