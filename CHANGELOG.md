@@ -3,6 +3,24 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.13
+
+- **Sports loads teams again.** Every league returned HTTP 403 because of the
+  `User-Agent`. ESPN's edge answers 403 to `IslandHUD/1.0` and — counterintuitively —
+  to a Chrome-like string, but 200 to OkHttp's own default. The polite custom header
+  was the bug; it is gone.
+- **The island covers the camera instead of sitting under it.** A 34 dp pill cannot
+  hide a 35 dp cutout, and the 12 dp touch margin added in 1.0.11 pushed it a further
+  12 dp down, so the top of the lens poked out. The pill now sizes itself to the
+  cutout plus 10 dp, and the touch margin is on the sides and bottom only — there is
+  nothing above the top edge of the screen to press.
+- **The nudge no longer follows you between screens.** Folding changes the display,
+  not the configuration of the context the service holds, so the fold went unnoticed
+  and the island kept the other screen's geometry — and its nudge. A display listener
+  catches it, with the existing monitor loop reconciling as a safety net.
+- **macOS: clicking the app in Finder opens Settings.** For an agent app with no Dock
+  icon and no window, clicking an already-running copy did nothing at all.
+
 ## 1.0.12
 
 - **The island no longer flashes between two positions after folding.** The
