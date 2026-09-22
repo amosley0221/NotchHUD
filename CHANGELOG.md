@@ -3,6 +3,19 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.7
+
+Found while verifying that the macOS app from 1.0.6 actually launches: it did, and
+then sat at ~12 % CPU doing nothing.
+
+- **The glow rail no longer breathes when the HUD has nothing to say.** A
+  `repeatForever` animation forces a Core Animation commit every frame for as long
+  as it runs, on every panel on every screen. A profile of the idle app showed the
+  main thread dominated by `CA::Transaction::flush`. The rail keeps its colour and
+  holds steady unless an agent is working, media is playing, a timer is running, a
+  followed game is live, Quiet is on, or the HUD is showing a toast, a call or the
+  expanded panel.
+
 ## 1.0.6
 
 The macOS app never ran, and the island missed the camera on the unfolded screen

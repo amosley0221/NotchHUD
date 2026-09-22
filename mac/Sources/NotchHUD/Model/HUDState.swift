@@ -53,6 +53,21 @@ final class HUDState: ObservableObject {
         return theme.accent
     }
 
+    /// Whether the light language currently has anything to say.
+    ///
+    /// Drives the glow animation, which costs a Core Animation commit every frame
+    /// for as long as it runs. A finished agent does not count — the rail keeps its
+    /// colour, it just stops breathing.
+    var hasLiveActivity: Bool {
+        if let state = primaryAgentState, state != .done { return true }
+        if media?.playing == true { return true }
+        if pomodoroRunning { return true }
+        if game?.live == true { return true }
+        if quietActive { return true }
+        if mode != .compact { return true }
+        return false
+    }
+
     var pendingApproval: Agent? {
         agents.first { $0.state == .permission }
     }
