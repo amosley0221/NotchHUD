@@ -36,9 +36,11 @@ object CutoutReader {
 
         val (screenW, screenH) = metrics
 
-        // Only the rect along the top edge is ours; a corner or waterfall cutout on
-        // the side is not something the island should try to wrap.
-        val rect = cutout?.boundingRects?.firstOrNull { it.top <= screenH / 4 }
+        // The largest cutout rect, wherever it sits. This used to be filtered to the
+        // top quarter of the screen, which is wrong on a Fold: unfolded and held
+        // sideways the punch-hole is against a side edge, the filter rejected it,
+        // and the island fell back to top-centre — nowhere near the camera.
+        val rect = cutout?.boundingRects?.maxByOrNull { it.width().toLong() * it.height().toLong() }
 
         // A Fold is "open" when the window is close to square; the cover screen is
         // a tall 23:9 strip. Cheaper and more reliable across OEM skins than

@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentCallbacks
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
@@ -143,6 +144,7 @@ class IslandOverlayService : LifecycleService() {
             observeSettings()
             startTransientReaper()
             startLockMonitor()
+            overlayContext.registerComponentCallbacks(overlayConfigCallback)
         } catch (t: Throwable) {
             CrashReporter.record(this, "island startup", t)
             stopSelf()
@@ -165,16 +167,31 @@ class IslandOverlayService : LifecycleService() {
         if (::mediaMonitor.isInitialized) mediaMonitor.stop()
         companion?.close()
         systemReceiver?.let { runCatching { unregisterReceiver(it) } }
+        runCatching { overlayContext.unregisterComponentCallbacks(overlayConfigCallback) }
         removeOverlay()
         super.onDestroy()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        // Fold, unfold or rotate: re-read the cutout and re-place the window.
+        refreshGeometry()
+    }
+
+    /** Fold, unfold or rotate: re-read the cutout and re-place the window. */
+    private fun refreshGeometry() {
         if (!::windowManager.isInitialized) return
         IslandState.setCutout(CutoutReader.read(overlayContext, windowManager))
         updateWindowPosition()
+    }
+
+    /**
+     * The window context has its own configuration, and it is the one that actually
+     * describes the display the overlay lives on. Listening to it as well as to the
+     * service means a rotation cannot be missed.
+     */
+    private val overlayConfigCallback = object : ComponentCallbacks {
+        override fun onConfigurationChanged(newConfig: Configuration) = refreshGeometry()
+        override fun onLowMemory() = Unit
     }
 
     override fun onTrimMemory(level: Int) {
@@ -300,7 +317,8 @@ class IslandOverlayService : LifecycleService() {
             // Pill top = cutout centre − half the pill height, so the camera sits
             // vertically centred inside the black shape.
             val pillHeightPx = ServiceRuntime.current.islandSize.pillHeightDp * density
-            val y = (geo.centerY - pillHeightPx / 2).toInt().coerceAtLeast(0)
+            val maxY = (geo.screenHeight - pillHeightPx.toInt() - marginPx).coerceAtLeast(0)
+            val y = (geo.centerY - pillHeightPx / 2).toInt().coerceIn(0, maxY)
 
             if (params.x != x || params.y != y) {
                 params.x = x

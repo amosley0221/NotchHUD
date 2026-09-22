@@ -16,8 +16,26 @@ rm -rf dist
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN_DIR/NotchHUD" "$APP/Contents/MacOS/NotchHUD"
-# Installed under the name people actually type; see the note in Package.swift.
-cp "$BIN_DIR/notchhud-cli" "$APP/Contents/MacOS/notchhud"
+
+# The CLI goes in Resources, NOT in MacOS. "MacOS/notchhud" and "MacOS/NotchHUD"
+# are the same path on a case-insensitive filesystem, so copying it next to the app
+# binary silently overwrites the app with the CLI — which is exactly what shipped
+# in 1.0.0 through 1.0.5: double-clicking the app ran the CLI, printed usage to a
+# terminal nobody was watching, and exited.
+cp "$BIN_DIR/notchhud-cli" "$APP/Contents/Resources/notchhud"
+chmod +x "$APP/Contents/Resources/notchhud"
+
+# Prove the app binary is the app. The failure above was invisible because both
+# files exist and both are executables; the only reliable tell is what they link.
+if ! otool -L "$APP/Contents/MacOS/NotchHUD" | grep -q SwiftUI; then
+  echo "error: Contents/MacOS/NotchHUD does not link SwiftUI — the wrong binary was copied" >&2
+  exit 1
+fi
+if ! "$APP/Contents/Resources/notchhud" 2>&1 | grep -q "push agent state"; then
+  echo "error: Contents/Resources/notchhud is not the CLI" >&2
+  exit 1
+fi
+echo "verified: app binary links SwiftUI, CLI responds to --help"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

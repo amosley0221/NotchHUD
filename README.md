@@ -14,7 +14,19 @@ They share one light language — blue running, orange needs-you, green done, re
 Every build is published on the [Releases page](https://github.com/amosley0221/NotchHUD/releases) with notes describing what changed.
 
 - **Android:** download `IslandHUD-<version>.apk` and open it on the phone.
-- **macOS:** download `NotchHUD-<version>-macos.zip`, unzip, and move `NotchHUD.app` to `/Applications`. It is ad-hoc signed, so the first launch needs right-click → **Open**.
+- **macOS:** download `NotchHUD-<version>-macos.zip`, unzip, and move `NotchHUD.app` to `/Applications`. It is ad-hoc signed rather than notarised (that needs a paid Apple Developer account), so Gatekeeper blocks it until you clear the download quarantine:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/NotchHUD.app
+```
+
+The app has no Dock icon — it lives in the menu bar. Settings opens by itself on the first launch.
+
+The `notchhud` CLI ships inside the bundle. To put it on your PATH:
+
+```bash
+ln -sf /Applications/NotchHUD.app/Contents/Resources/notchhud /usr/local/bin/notchhud
+```
 
 ### Updating the Android app never requires an uninstall
 

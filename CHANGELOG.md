@@ -3,6 +3,30 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.6
+
+The macOS app never ran, and the island missed the camera on the unfolded screen
+in landscape.
+
+- **The macOS app shipped the wrong binary.** `make_app.sh` copied the CLI to
+  `Contents/MacOS/notchhud`, which is the same path as `Contents/MacOS/NotchHUD`
+  on a case-insensitive filesystem — so it overwrote the app. Every build from
+  1.0.0 to 1.0.5 contained the CLI under the app's name: double-clicking it printed
+  usage to a terminal nobody was watching and exited, which looked exactly like
+  nothing happening. The CLI now lives at `Contents/Resources/notchhud`, and the
+  build fails if the app binary does not link SwiftUI.
+- **Settings opens on first launch.** An agent app has no Dock icon and no window,
+  so there was nothing to show that the app had started.
+- **The island follows the camera when the Fold is unfolded and held sideways.**
+  The cutout reader only accepted a rect in the top quarter of the screen; in
+  landscape the punch-hole is against a side edge, so it was rejected and the
+  island fell back to top-centre. It now takes the largest cutout rect wherever it
+  is, and the window is clamped on both axes.
+- **Rotations cannot be missed**, via a configuration listener on the overlay's own
+  window context in addition to the service's.
+- README documents clearing the Gatekeeper quarantine, which is required because
+  the app is ad-hoc signed rather than notarised.
+
 ## 1.0.5
 
 The island runs. This is the first release fixing behaviour rather than a crash.

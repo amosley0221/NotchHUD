@@ -37,6 +37,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installMenuBarItem()
         installEscMonitor()
 
+        // No Dock icon and no window means a first launch looks like nothing
+        // happened. Show Settings once so the app is findable; after that it lives
+        // in the menu bar like any other agent app.
+        if !UserDefaults.standard.bool(forKey: "hasLaunchedBefore") {
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+            openSettings()
+        }
+
         pomodoroTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in HUDState.shared.tickPomodoro() }
         }
