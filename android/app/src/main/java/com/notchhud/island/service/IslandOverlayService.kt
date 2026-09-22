@@ -10,8 +10,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.IBinder
+import android.view.Display
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -67,11 +69,27 @@ class IslandOverlayService : LifecycleService() {
 
     // An overlay must be built from a window context on Android 11+: it is what
     // makes getCurrentWindowMetrics legal and what gives the view the right
-    // display and density. A plain Service context throws.
-    private val overlayContext: Context by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
-        } else {
+    // display and density.
+    //
+    // Getting one from a Service takes two steps. createWindowContext(type, options)
+    // infers the display by calling getDisplay() on the receiver, and a Service is
+    // not associated with a display, so that overload throws
+    // UnsupportedOperationException. Naming the display first with
+    // createDisplayContext() produces a context that *is* associated with one, and
+    // createWindowContext on that is valid.
+    private val overlayContext: Context by lazy { createOverlayContext() }
+
+    private fun createOverlayContext(): Context {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return this
+        return runCatching {
+            val displays = getSystemService(DisplayManager::class.java)
+            val display = displays.getDisplay(Display.DEFAULT_DISPLAY)
+            createDisplayContext(display)
+                .createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
+        }.getOrElse {
+            // Degrade rather than die: the island still draws, and CutoutReader
+            // falls back to display metrics when the window metrics are unavailable.
+            CrashReporter.record(this, "creating the overlay window context", it)
             this
         }
     }
@@ -97,11 +115,10 @@ class IslandOverlayService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         running = true
-        windowManager = overlayContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        settingsRepo = SettingsRepository(applicationContext)
-        mediaMonitor = MediaMonitor(applicationContext)
-        haptics = Haptics(applicationContext)
 
+        // First, and before anything that can throw. Android gives a service
+        // started with startForegroundService five seconds to get here; if we crash
+        // on the way, the report is a timeout rather than the actual cause.
         startForeground(NOTIFICATION_ID, buildNotification())
 
         // Everything past this point touches window geometry, OEM-specific
@@ -109,6 +126,11 @@ class IslandOverlayService : LifecycleService() {
         // here would otherwise kill the process with nothing on screen to explain
         // it, so record it where the setup screen can show it and stop cleanly.
         try {
+            windowManager = overlayContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            settingsRepo = SettingsRepository(applicationContext)
+            mediaMonitor = MediaMonitor(applicationContext)
+            haptics = Haptics(applicationContext)
+
             IslandState.setCutout(CutoutReader.read(overlayContext, windowManager))
             IslandState.setLocked(
                 (getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
@@ -137,7 +159,8 @@ class IslandOverlayService : LifecycleService() {
 
     override fun onDestroy() {
         running = false
-        mediaMonitor.stop()
+        // Startup may have aborted before these were assigned.
+        if (::mediaMonitor.isInitialized) mediaMonitor.stop()
         companion?.close()
         systemReceiver?.let { runCatching { unregisterReceiver(it) } }
         removeOverlay()
@@ -147,6 +170,7 @@ class IslandOverlayService : LifecycleService() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         // Fold, unfold or rotate: re-read the cutout and re-place the window.
+        if (!::windowManager.isInitialized) return
         IslandState.setCutout(CutoutReader.read(overlayContext, windowManager))
         updateWindowPosition()
     }

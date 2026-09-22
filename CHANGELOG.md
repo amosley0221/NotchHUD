@@ -3,6 +3,27 @@
 Notable changes per release. Each version's section becomes the top of that
 release's notes on the Releases page.
 
+## 1.0.3
+
+Actually fixes the crash on starting the island. Confirmed against a real trace
+from a Galaxy Z Fold 8 on Android 17 (API 37), captured by the reporter added in
+1.0.2.
+
+- **The window context is now built from an explicit display.** 1.0.2 called
+  `createWindowContext(type, options)` on the Service. That overload infers the
+  display by calling `getDisplay()` on the receiver, and a Service is not
+  associated with a display — so the call added to fix the crash threw the same
+  `UnsupportedOperationException` one frame earlier. Naming the default display
+  with `createDisplayContext()` first produces a context that is associated with
+  one, and `createWindowContext` on that is valid.
+- **Failing to build the window context no longer stops the island.** It falls
+  back to the Service context and records why; the cutout read already degrades to
+  display metrics.
+- **`startForeground` now runs before anything that can throw,** so a startup
+  failure is reported as itself rather than as a five-second foreground-service
+  timeout.
+- Shutdown and configuration changes tolerate a startup that aborted partway.
+
 ## 1.0.2
 
 Fixes the crash on starting the island.
